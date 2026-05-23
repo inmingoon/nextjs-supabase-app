@@ -197,6 +197,18 @@ export type Database = {
       }
     }
     Functions: {
+      get_group_by_invite_token: {
+        Args: { token: string }
+        Returns: {
+          description: string
+          id: string
+          name: string
+        }[]
+      }
+      is_group_member: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: boolean
+      }
       join_group_by_token: { Args: { token: string }; Returns: string }
     }
     Enums: {
