@@ -186,7 +186,37 @@ create policy profiles_select_group_members on public.profiles
 
 기존 `profiles_select_own`과 OR로 합쳐져 "본인 OR 같은 그룹 멤버"가 read 가능. 이 정책은 `groups`·`group_members` 테이블 생성 **이후**에 추가되어야 하므로 본 MVP 마이그레이션 안에 포함한다.
 
-### 3.5 가입 RPC
+### 3.5 RLS 무한 재귀 회피 헬퍼
+
+`group_members_select_same_group` 정책이 `group_members` 자신을 subquery로 참조하면 PostgreSQL이 RLS 평가 중 동일 정책을 재귀 호출해 ERROR 42P17가 발생한다. 표준 해결책은 `SECURITY DEFINER` 헬퍼 함수로 RLS를 우회하는 것:
+
+```sql
+create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.group_members
+    where group_id = p_group_id and user_id = p_user_id
+  );
+$$;
+```
+
+`group_members_select_same_group` 정책은 이 함수를 호출하도록 작성한다:
+
+```sql
+create policy group_members_select_same_group on public.group_members
+  for select using (
+    public.is_group_member(group_id, (select auth.uid()))
+  );
+```
+
+다른 정책들은 `group_members`를 **외부에서** 참조하므로 (예: `groups_select_member_or_owner`, `events_select_group_member`, `ep_select_group_member`, `profiles_select_group_members`) 재귀가 발생하지 않는다. 헬퍼 함수 도입은 `group_members` 정책 하나에만 영향.
+
+### 3.6 가입 RPC
 
 ```sql
 create or replace function join_group_by_token(token text)

@@ -149,14 +149,26 @@ create policy groups_delete_owner on public.groups
 
 ```sql
 -- group_members 정책
--- SELECT: 같은 그룹의 멤버끼리 서로 보임
+
+-- SECURITY DEFINER 헬퍼: group_members SELECT 정책에서 자기 테이블을 직접 참조하면
+-- 무한 재귀(ERROR 42P17)가 발생한다. 헬퍼 함수는 RLS를 우회하여 재귀를 방지.
+create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.group_members
+    where group_id = p_group_id and user_id = p_user_id
+  );
+$$;
+
+-- SELECT: 같은 그룹의 멤버끼리 서로 보임 (헬퍼 함수로 재귀 방지)
 create policy group_members_select_same_group on public.group_members
   for select using (
-    exists (
-      select 1 from public.group_members me
-      where me.group_id = group_members.group_id
-        and me.user_id = (select auth.uid())
-    )
+    public.is_group_member(group_id, (select auth.uid()))
   );
 
 -- INSERT: 직접 insert 차단. 가입은 join_group_by_token RPC만 허용.
