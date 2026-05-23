@@ -83,12 +83,15 @@ create policy groups_delete_owner on public.groups
 -- group_members 정책
 -- SECURITY DEFINER 헬퍼: group_members SELECT 정책에서 자기 테이블을 직접 참조하면
 -- 무한 재귀(42P17)가 발생한다. 헬퍼 함수는 RLS를 우회하여 재귀를 방지.
+-- 주의: security definer만으로는 RLS 우회가 보장 안 됨 — set row_security = off 명시.
+-- 누락 시 함수 내부 select가 group_members RLS 정책을 다시 호출 → 또 다른 재귀.
 create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
 returns boolean
 language sql
 security definer
 stable
 set search_path = public
+set row_security = off
 as $$
   select exists (
     select 1 from public.group_members

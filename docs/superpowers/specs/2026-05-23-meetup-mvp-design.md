@@ -197,6 +197,7 @@ language sql
 security definer
 stable
 set search_path = public
+set row_security = off  -- security definer만으론 RLS 우회 부족, 명시 필요
 as $$
   select exists (
     select 1 from public.group_members
@@ -204,6 +205,8 @@ as $$
   );
 $$;
 ```
+
+**중요**: `set row_security = off`를 빼면 함수 내부 `select`가 다시 `group_members` RLS 정책을 호출해 또 다른 무한 재귀가 발생한다 (Phase 1 OAuth 수동 검증 중 `createGroupAction`에서 `group_members.insert`가 실패하며 발견된 누락).
 
 `group_members_select_same_group` 정책은 이 함수를 호출하도록 작성한다:
 
