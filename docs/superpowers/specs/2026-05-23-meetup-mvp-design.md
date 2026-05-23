@@ -343,6 +343,48 @@ app/
 
 ---
 
+### 5.5 PPR 적응 패턴 (`cacheComponents: true`)
+
+`next.config.ts`에 `cacheComponents: true`가 설정되어 있어 Next 15의 PPR(Partial Prerendering)이 활성화된다. 이 환경에서는 Server Component page의 최상위에서 `await`(특히 `supabase.auth.getClaims()` 같은 동적 데이터 fetching)를 호출하면 빌드가 깨진다. 모든 Server Component page는 다음 패턴으로 작성:
+
+```tsx
+async function PageContent({ /* params */ }: { /* ... */ }) {
+  // 실제 데이터 fetching·인증 검증·redirect는 여기서
+  const supabase = await createClient();
+  // ...
+  return <>{/* 페이지 본문 */}</>;
+}
+
+export default async function Page(props: { params: Promise<{ ... }> }) {
+  const params = await props.params;  // params 해석은 page에서 OK
+  return (
+    <main>
+      <Suspense fallback={null}>
+        <PageContent {...params} />
+      </Suspense>
+    </main>
+  );
+}
+```
+
+기존 `app/protected/page.tsx`가 이 패턴의 참고 구현이고, 본 MVP의 `/groups/new`, `/groups/[groupId]`, `/invite/[token]`, `/` 모두 같은 패턴을 따른다. 빌드 시 라우트 표기는 `◐ (Partial Prerender)`.
+
+### 5.6 proxy 화이트리스트
+
+`lib/supabase/proxy.ts`의 기본 인증 가드는 `/`, `/login*`, `/auth*` 외 모든 경로를 `/auth/login`으로 redirect한다. 본 MVP의 `/invite/<token>` 경로는 **비로그인 사용자가 그룹명·"Google로 로그인" 버튼을 보는 분기**(spec §5.2 초대 관문 §분기 b)가 작동해야 하므로 화이트리스트에 추가:
+
+```ts
+if (
+  request.nextUrl.pathname !== "/" &&
+  !user &&
+  !request.nextUrl.pathname.startsWith("/login") &&
+  !request.nextUrl.pathname.startsWith("/auth") &&
+  !request.nextUrl.pathname.startsWith("/invite/")   // ← 본 MVP에서 추가
+) { /* redirect to /auth/login */ }
+```
+
+이 보강 없이는 V4(무효 토큰 → 거부 화면)와 분기 (b) 둘 다 작동하지 않는다 (Phase 1 자동 검증에서 발견된 누락).
+
 ## 6. 마일스톤 (1인 개발 5~7영업일 예상)
 
 ### M1. 스키마 + RLS + RPC (1d)

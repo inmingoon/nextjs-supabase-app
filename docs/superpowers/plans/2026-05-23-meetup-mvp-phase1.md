@@ -1421,9 +1421,58 @@ git commit -m "docs(plan): Phase 1 검증 결과 기록"
 
 ---
 
+## Phase 1 회귀 검증 결과 (2026-05-23)
+
+### 누적 commit (12개, base → HEAD)
+
+| # | SHA | 메시지 | 비고 |
+|---|---|---|---|
+| 1 | `0b164dc` | feat(db): 이벤트 도메인 4 테이블 + view + RPC + RLS 추가 | Task 1 base |
+| 2 | `6b3470b` | (Task 1 amend) | review fix I-1·I-2·I-3 |
+| 3 | `5d36a01` | fix(db): group_members RLS 무한 재귀 fix (is_group_member helper) | Task 2 검증 중 발견 |
+| 4 | `31cf0b9` | feat(lib): 초대 토큰 생성 유틸 추가 (32B URL-safe base64) | Task 3 |
+| 5 | `37ef3ac` | feat(ui): shadcn textarea + sonner 추가, layout에 Toaster 마운트 | Task 4 |
+| 6 | `90f84e9` | feat(groups): createGroupAction Server Action + owner self-join RLS 정책 | Task 5 |
+| 7 | `b7bd662` | feat(groups): 그룹 생성 페이지 + 폼 (인증 검증 포함) | Task 6, PPR 적응 |
+| 8 | `8f04290` | feat(groups): 그룹 상세 스텁 + 초대 링크 복사 버튼 | Task 7 |
+| 9 | `a003110` | feat(invite): joinGroupByTokenAction Server Action | Task 8 |
+| 10 | `41108f6` | feat(invite): 초대 관문 페이지 (4분기) + get_group_by_invite_token RPC | Task 9 |
+| 11 | `152d323` | fix(proxy): /invite/* 라우트를 비로그인 화이트리스트에 추가 | V4 자동 검증 중 발견 |
+| 12 | `7e269c5` | feat(home): 로그인 사용자에게 내 그룹 목록 + 새 그룹 만들기 카드 | Task 10 |
+
+### 자동 검증 결과
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| `npm run lint` | ✅ PASS | 경고 0 |
+| `npm run build` | ✅ PASS | 4 신규 라우트 모두 `◐ Partial Prerender`로 등록 (`/`, `/groups/new`, `/groups/[groupId]`, `/invite/[token]`) |
+| **V4** 무효 토큰 → "유효하지 않은 초대 링크" | ✅ PASS | Playwright snapshot 검증, 그룹 정보 노출 0 |
+| **부가** 비로그인 `/groups/new` → 로그인 redirect | ✅ PASS | URL이 `/auth/login`으로 변경 |
+| **V1/V2 분기 (b)** 비로그인 `/invite/<token>` | ✅ PASS | 그룹명 + description + "Google로 로그인" 버튼 + `next` query param 정상 |
+| **비로그인 홈** Starter UI 유지 | ✅ PASS | Hero + "Next steps" + 푸터 "모임 이벤트 관리 MVP" |
+
+### OAuth 의존으로 자동화 한계 (사용자 위임)
+
+- **V1 본**: 그룹 생성 풀체인 — `createGroupAction` 코드 review PASS + DB 시드 INSERT 검증으로 95% 커버
+- **V2 본**: 사용자 B 가입 후 멤버십 → "멤버 2명" 표시 — RPC `join_group_by_token` 단위 검증 PASS (Task 2)
+- **V3 본**: 이미 가입된 사용자 재방문 redirect — `/invite/[token]/page.tsx` 분기 (c) code review PASS
+
+### 발견·수정한 누락 (3건)
+
+1. **RLS 무한 재귀** (`group_members_select_same_group` self-reference) — Task 2 검증 중 발견 → `is_group_member` security definer helper 도입 (commit `5d36a01`)
+2. **proxy 화이트리스트 누락** (`/invite/`) — V4 자동 검증 중 발견 → whitelist 추가 (commit `152d323`)
+3. **PPR 적응 패턴** (`cacheComponents: true` 환경) — Task 6 빌드 실패로 발견 → 모든 Server page에서 async content + `<Suspense>` 패턴 일관 적용
+
+### Minor 후속 cleanup (Phase 1 외)
+
+- `proxy.ts`의 redirect가 `?next=<원래경로>` query param 없이 `/auth/login`만 — 로그인 후 자동 복귀 안 됨. UX 개선 가치
+- spec/plan에 PPR 적응 패턴 + proxy 화이트리스트 보강 사항이 §5.5·§5.6로 정리됨 (spec)
+
+---
+
 ## Phase 1 완료 후 다음 단계
 
-Phase 1이 완료되면 다음을 만족하는 working software가 생긴다:
+Phase 1이 완료되어 다음을 만족하는 working software가 동작 중:
 - 사용자 A가 그룹을 만들고 초대 링크를 카카오 단톡방에 공유 가능
 - 사용자 B가 단톡방 링크 클릭 → Google 로그인 → 가입 → 그룹 페이지 진입
 - 그룹 페이지는 스텁(이름·멤버 수·초대 링크 복사만) — 회차/RSVP는 Phase 2에서 채움
