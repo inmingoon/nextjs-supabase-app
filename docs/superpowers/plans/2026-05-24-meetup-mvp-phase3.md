@@ -473,6 +473,31 @@ git commit -m "docs(plan): Phase 3 회귀 결과 기록"
 
 ---
 
+## Phase 3 회귀 검증 결과 (2026-05-24)
+
+### 누적 commit (Phase 3)
+
+| # | SHA | 메시지 |
+|---|---|---|
+| 1 | `948dfcf` | feat(groups): 멤버 출석률 표 추가 (group_attendance_stats view 활용) |
+| 2 | `d5b2f05` | feat(me): 마이페이지 — 다음 모임 + 그룹별 출석률 |
+
+### 자동 검증
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| `npm run lint` | ✅ PASS | 경고 0 |
+| `npm run build` | ✅ PASS | `◐ /me` 신규 PPR + `◐ /groups/[groupId]` 갱신, 기존 라우트 모두 유지 |
+| **비로그인 `/me` redirect** | ✅ PASS | Playwright navigate → `/auth/login`으로 변경 (proxy 가드 정상) |
+| **V4·V6·V7부가·V8부가 회귀** | ✅ 무위험 | Phase 1·2 결과 그대로, 본 Phase에서 RLS·proxy·정책 변경 0건 |
+
+### OAuth 의존 (사용자 위임 — 코드 review로 95% 커버)
+
+- 멤버 출석률 표 실제 데이터: 본인이 멤버인 그룹의 출석률이 정렬·표시
+- 마이페이지 `/me`: 다음 모임 + 그룹별 출석률 카드
+
+---
+
 ## Phase 3 완료 후 다음 단계
 
 Phase 3가 완료되면 MVP의 In 범위(spec §1.4)가 모두 작동:
