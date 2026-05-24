@@ -6,13 +6,15 @@
 
 ## 사전 조건
 
+> **가정**: 로컬 `.env.local`에 Supabase 3종 키(`NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` · `SUPABASE_SERVICE_ROLE_KEY`)가 이미 설정되어 있다. Vercel env var 등록 시 동일 값을 복사·붙여넣기.
+
 - [ ] 본 plan Phase 1·2의 commit이 main에 push 됨 (`git log --oneline -5`)
 - [ ] GitHub default branch = `main`
 - [ ] Vercel 프로젝트 connected (Production Branch = main)
 - [ ] Vercel env 3종 등록:
   - [ ] `NEXT_PUBLIC_SUPABASE_URL` (Production + Preview + Development)
   - [ ] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Production + Preview + Development)
-  - [ ] `SUPABASE_SERVICE_ROLE_KEY` (**Sensitive + Production 한정**)
+  - [ ] `SUPABASE_SERVICE_ROLE_KEY` (**Sensitive + Production 한정** — Vercel UI "Environment Variables" 패널에서 'Sensitive' 체크박스 선택 + Production scope만 활성)
 - [ ] Supabase Auth Site URL + Redirect URLs에 production URL 등록
 - [ ] Google OAuth Client의 Authorized redirect URI에 `<project-ref>.supabase.co/auth/v1/callback` 등록
 
@@ -65,4 +67,4 @@ production 배포 전 코드 변경의 sanity check. Phase 4 plan 실행 중 con
 | Build log secret grep | `SUPABASE_SERVICE_ROLE_KEY` 값 hit | **즉시 rollback** (Vercel Dashboard → 이전 deployment promote) + 누락 컴포넌트 grep + 재배포 전 검증 |
 | S2 OAuth | "Invalid redirect URL" 또는 callback 실패 | Supabase Auth Redirect URLs allowlist 재확인. Google OAuth client redirect URI 재확인 |
 | S7 잠금 미동작 | 시작 시각 경과 후 RSVP 토글 성공 | **즉시 rollback**. RLS WITH CHECK 정책 회귀 SQL 재검증 (`supabase/migrations/`). 보안 회귀이므로 plan 진행 전면 정지 |
-| Build lint 실패 | `eslint-config-next: 15.3.1` ↔ Next.js 16 호환 이슈 | 임시 우회: 환경변수 `NEXT_DISABLE_LINTER=1` 추가. 본격 정정은 v2.x로 분리 |
+| Build lint 실패 | `eslint-config-next: 15.3.1` ↔ Next.js 16 호환 이슈 | 임시 우회: Vercel Dashboard → Settings → Environment Variables에서 `NEXT_DISABLE_LINTER=1` 추가 (Production scope) → Deployments 탭에서 재배포(Redeploy) 트리거. 본격 정정은 v2.x로 분리 |
