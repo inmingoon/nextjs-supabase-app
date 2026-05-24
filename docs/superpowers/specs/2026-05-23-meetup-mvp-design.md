@@ -191,22 +191,33 @@ create policy profiles_select_group_members on public.profiles
 `group_members_select_same_group` 정책이 `group_members` 자신을 subquery로 참조하면 PostgreSQL이 RLS 평가 중 동일 정책을 재귀 호출해 ERROR 42P17가 발생한다. 표준 해결책은 `SECURITY DEFINER` 헬퍼 함수로 RLS를 우회하는 것:
 
 ```sql
+-- 3중 안전장치: plpgsql(inline 방지) + body SET LOCAL + owner postgres(BYPASSRLS)
 create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
 returns boolean
-language sql
+language plpgsql
 security definer
 stable
 set search_path = public
-set row_security = off  -- security definer만으론 RLS 우회 부족, 명시 필요
 as $$
-  select exists (
+begin
+  set local row_security to off;
+  return exists (
     select 1 from public.group_members
     where group_id = p_group_id and user_id = p_user_id
   );
+end;
 $$;
+
+alter function public.is_group_member(uuid, uuid) owner to postgres;
 ```
 
-**중요**: `set row_security = off`를 빼면 함수 내부 `select`가 다시 `group_members` RLS 정책을 호출해 또 다른 무한 재귀가 발생한다 (Phase 1 OAuth 수동 검증 중 `createGroupAction`에서 `group_members.insert`가 실패하며 발견된 누락).
+**중요**: 다음 3가지를 모두 빼면 무한 재귀 발생 (Phase 1 OAuth 수동 검증 중 발견):
+
+1. `language plpgsql` (대신 `sql + stable`이면 PostgreSQL planner가 함수를 호출 쿼리에 inline해서 함수 옵션 `SET row_security`가 무시됨)
+2. body의 `set local row_security to off` (함수 옵션 `SET row_security`가 inline 외에도 다른 평가 경로에서 누락되는 경우의 backup)
+3. `owner postgres` (BYPASSRLS 권한 보유 role로 security definer가 동작)
+
+추가로 **`groups_select_member_or_owner` 정책의 OR 두 번째 절도 `group_members` 직접 참조 대신 이 헬퍼를 호출**해야 self-reference 사이클이 끊긴다 (§4 RLS 표 참조).
 
 `group_members_select_same_group` 정책은 이 함수를 호출하도록 작성한다:
 

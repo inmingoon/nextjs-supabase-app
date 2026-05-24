@@ -1459,11 +1459,12 @@ git commit -m "docs(plan): Phase 1 검증 결과 기록"
 - **V2 본**: 사용자 B 가입 후 멤버십 → "멤버 2명" 표시 — RPC `join_group_by_token` 단위 검증 PASS (Task 2)
 - **V3 본**: 이미 가입된 사용자 재방문 redirect — `/invite/[token]/page.tsx` 분기 (c) code review PASS
 
-### 발견·수정한 누락 (3건)
+### 발견·수정한 누락 (4건)
 
-1. **RLS 무한 재귀** (`group_members_select_same_group` self-reference) — Task 2 검증 중 발견 → `is_group_member` security definer helper 도입 (commit `5d36a01`)
+1. **RLS 무한 재귀 1차** (`group_members_select_same_group` self-reference) — Task 2 검증 중 발견 → `is_group_member` security definer helper 도입 (commit `5d36a01`)
 2. **proxy 화이트리스트 누락** (`/invite/`) — V4 자동 검증 중 발견 → whitelist 추가 (commit `152d323`)
 3. **PPR 적응 패턴** (`cacheComponents: true` 환경) — Task 6 빌드 실패로 발견 → 모든 Server page에서 async content + `<Suspense>` 패턴 일관 적용
+4. **RLS 무한 재귀 2차** (V1 OAuth 검증 중 `createGroupAction`의 `group_members.insert`가 같은 에러로 실패) — 원인 두 갈래: (a) `is_group_member` helper가 `language sql + stable`이라 PostgreSQL planner가 inline → 함수 옵션 `SET row_security` 무시. (b) `groups_select_member_or_owner` 정책의 OR 두 번째 절이 `group_members`를 직접 참조해 INSERT 흐름에서 self-reference 사이클 형성. → 보정 마이그레이션 `20260524000000_phase1_rls_recursion_fix.sql`: helper를 plpgsql로 변환 + body에 `SET LOCAL row_security TO OFF` + owner를 `postgres`(BYPASSRLS)로 변경 + groups 정책의 OR 두 번째 절을 helper 호출로 교체.
 
 ### Minor 후속 cleanup (Phase 1 외)
 
