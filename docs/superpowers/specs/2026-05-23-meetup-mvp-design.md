@@ -192,11 +192,12 @@ create policy profiles_select_group_members on public.profiles
 
 ```sql
 -- 3중 안전장치: plpgsql(inline 방지) + body SET LOCAL + owner postgres(BYPASSRLS)
+-- 주의: stable 마킹 X — STABLE 함수에선 SET LOCAL 금지(ERROR 0A000).
 create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
 returns boolean
 language plpgsql
 security definer
-stable
+-- volatile (stable 제거)
 set search_path = public
 as $$
 begin

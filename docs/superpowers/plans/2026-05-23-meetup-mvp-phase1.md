@@ -1465,6 +1465,7 @@ git commit -m "docs(plan): Phase 1 검증 결과 기록"
 2. **proxy 화이트리스트 누락** (`/invite/`) — V4 자동 검증 중 발견 → whitelist 추가 (commit `152d323`)
 3. **PPR 적응 패턴** (`cacheComponents: true` 환경) — Task 6 빌드 실패로 발견 → 모든 Server page에서 async content + `<Suspense>` 패턴 일관 적용
 4. **RLS 무한 재귀 2차** (V1 OAuth 검증 중 `createGroupAction`의 `group_members.insert`가 같은 에러로 실패) — 원인 두 갈래: (a) `is_group_member` helper가 `language sql + stable`이라 PostgreSQL planner가 inline → 함수 옵션 `SET row_security` 무시. (b) `groups_select_member_or_owner` 정책의 OR 두 번째 절이 `group_members`를 직접 참조해 INSERT 흐름에서 self-reference 사이클 형성. → 보정 마이그레이션 `20260524000000_phase1_rls_recursion_fix.sql`: helper를 plpgsql로 변환 + body에 `SET LOCAL row_security TO OFF` + owner를 `postgres`(BYPASSRLS)로 변경 + groups 정책의 OR 두 번째 절을 helper 호출로 교체.
+5. **STABLE 함수에서 SET LOCAL 금지** (그룹 상세 페이지가 "멤버 0명"으로 표시되어 발견. JWT 시뮬레이션으로 helper 호출 시 `ERROR 0A000: SET is not allowed in a non-volatile function`). 4번 fix에서 helper에 `stable` 마킹을 남겼는데, PostgreSQL은 STABLE 함수 body에서 `SET LOCAL`을 거부한다. helper가 volatile 분류(default)이면 OK. → 같은 보정 마이그레이션에서 `stable` 키워드 제거. V1 INSERT는 groups 정책의 `owner_id = auth.uid()` OR 첫 번째 절 short-circuit으로 helper 호출을 skip해 통과했으나, 그룹 상세 페이지의 count query는 helper 호출 필수라 실패해 0 반환.
 
 ### Minor 후속 cleanup (Phase 1 외)
 

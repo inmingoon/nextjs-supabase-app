@@ -9,12 +9,16 @@
 --         group_members INSERT → WITH CHECK → groups SELECT → group_members SELECT.
 --
 -- Fix 1: helper를 plpgsql로 변경(inline 방지) + body에 SET LOCAL row_security TO OFF +
---        owner를 postgres(BYPASSRLS 보유)로 명시 변경. 3중 안전장치.
+--        owner를 postgres(BYPASSRLS 보유)로 명시 변경.
+--
+-- 주의: `stable`은 제거(=volatile)해야 한다. PostgreSQL은 `STABLE` 함수 body 안
+-- `SET LOCAL`을 금지(ERROR 0A000: SET is not allowed in a non-volatile function).
+-- helper가 sub-query에서 매번 호출되어도 RLS 평가는 query별로 한 번씩이라 비용 무관.
 create or replace function public.is_group_member(p_group_id uuid, p_user_id uuid)
 returns boolean
 language plpgsql
 security definer
-stable
+-- volatile (stable 제거 — body의 SET LOCAL을 허용하기 위해)
 set search_path = public
 as $$
 begin
