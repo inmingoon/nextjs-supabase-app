@@ -313,25 +313,26 @@ MVP 검증 단계라 본 지표들은 모두 **가설**입니다. v1.2 사용자
 
 ## 기술 스택 체크리스트
 
-### 이미 설치됨 ✅
+### 이미 설치됨 ✅ (실측 기준 — Phase 4 Task 1.3에서 정정)
 
 - [x] Next.js 16.2.6 (App Router + Cache Components + `proxy.ts`)
-- [x] TypeScript 5.6+
+- [x] TypeScript 5.9.3
 - [x] React 19
-- [x] Tailwind CSS v4
-- [x] shadcn/ui (new-york 스타일)
+- [x] Tailwind CSS v3.4.19 (⚠️ 이전 ROADMAP 표기 "v4"는 오류. PostCSS + `autoprefixer` + `tailwindcss-animate` 셋업)
+- [x] shadcn/ui (CLI 복사형 — `package.json` 의존성에 안 잡히는 게 정상. `components/ui/` 디렉터리에 컴포넌트 코드 직접 포함)
 - [x] Lucide React
 - [x] next-themes (다크모드)
 - [x] Supabase (`@supabase/ssr`, `@supabase/supabase-js`)
 - [x] PostgreSQL RLS + WITH CHECK 정책
 - [x] `lib/datetime.ts` (KST 고정 유틸)
-- [x] ESLint, Prettier
+- [x] ESLint만 — Prettier · Husky 미설치 (v2.x에서 검토)
 
 ### 추가 필요 (v1.1~v2.0)
 
 - [ ] `@vercel/analytics` (Task 018, v1.1 운영 관측)
 - [ ] `recharts` (Task 026, v2.0 출석률 차트 채택 시)
 - [ ] Vercel cron 또는 GitHub Action (Supabase 콜드 스타트 방지 health-check)
+- [ ] Prettier · Husky · lint-staged (v2.x, 코드 스타일 통일이 필요할 시 — Phase 4 정찰에서 미설치 확인)
 
 ## 품질 체크리스트
 
