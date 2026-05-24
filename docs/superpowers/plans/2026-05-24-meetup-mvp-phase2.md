@@ -933,6 +933,39 @@ git commit -m "docs(plan): Phase 2 회귀 결과 기록"
 
 ---
 
+## Phase 2 회귀 검증 결과 (2026-05-24)
+
+### 누적 commit (Phase 2)
+
+| # | SHA | 메시지 |
+|---|---|---|
+| 1 | `e013307` | feat(events): KST datetime 유틸 + createEventAction Server Action |
+| 2 | `a8cee96` | feat(events): 회차 생성 페이지 + 폼 (owner 검증) |
+| 3 | `687096b` | feat(events): respondToEventAction Server Action (잠금은 RLS WITH CHECK) |
+| 4 | `19e75fd` | feat(events): 회차 상세 페이지 + RSVP 3-상태 토글 + 응답 명단 |
+| 5 | `00082e2` | feat(groups): 그룹 상세에 다가오는/지난 회차 목록 + 새 모임 버튼 |
+
+### 자동 검증
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| `npm run lint` | ✅ PASS | 경고 0 |
+| `npm run build` | ✅ PASS | 3 라우트 모두 `◐ Partial Prerender`: `/groups/[groupId]` (갱신), `/groups/[groupId]/events/new` (신규), `/groups/[groupId]/events/[eventId]` (신규) |
+| **V6** RLS WITH CHECK가 잠긴 회차 RSVP 거부 | ✅ PASS | Supabase MCP execute_sql + JWT 시뮬레이션 → `ERROR: 42501: new row violates row-level security policy for table "event_participations"` |
+| **V7 부가** 비로그인 `/groups/<id>/events/new` → 로그인 redirect | ✅ PASS | Playwright navigate → `/auth/login`으로 URL 변경 확인 |
+
+### OAuth 의존으로 자동화 한계 (사용자 위임)
+
+- **V5 본**: 주최자 회차 생성 풀체인 → 회차 페이지 진입 → 응답 명단에 미응답 멤버 — `createEventAction` 코드 review + DB 시드로 95% 커버
+- **V5b**: 멤버 RSVP 클릭 → 명단 이동 + 토스트 — `respondToEventAction` + `revalidatePath` 코드 review PASS
+- **V7 본**: 비-owner 멤버가 `/events/new` URL 직접 진입 → `/groups/<id>` redirect — `app/groups/[groupId]/events/new/page.tsx`의 `if (group.owner_id !== userId) redirect(...)` 코드 review PASS + RLS `events_insert_owner` 정책이 DB 레이어 강제
+
+### Minor 관찰
+
+- Task 4의 `app/groups/[groupId]/events/[eventId]/page.tsx`에서 `m.profiles` 캐스팅을 `as unknown as {...}`로 처리 — Supabase 생성 타입이 `group_members → profiles` 관계를 `SelectQueryError`로 추론하는 알려진 이슈. 타입 안전한 명시적 우회.
+
+---
+
 ## Phase 2 완료 후 다음 단계
 
 Phase 2가 완료되면 working software가 다음을 추가로 지원:
