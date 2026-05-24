@@ -223,9 +223,9 @@
 - 응답 잠금은 **앱 코드가 아닌 DB RLS에서 강제** → 클라이언트 우회 불가.
 - 비밀 키(`SUPABASE_SERVICE_ROLE_KEY`)는 시드 스크립트 외 앱 코드에서 import 금지. 빌드 산출물 grep으로 미포함 확인 필요(배포 전).
 
-### 5.5 렌더링·캐싱 (Next.js 15 + PPR)
+### 5.5 렌더링·캐싱 (Next.js 16 + Cache Components)
 
-- `next.config.ts`에 `cacheComponents: true` (PPR Partial Prerendering 활성화).
+- `next.config.ts`에 `cacheComponents: true` (Cache Components 활성화).
 - Server Component page는 다음 패턴 필수:
 
 ```tsx
@@ -247,16 +247,17 @@ export default async function Page(props) {
 }
 ```
 
-- 빌드 시 본 MVP의 모든 페이지가 `◐ (Partial Prerender)` 표기로 등록.
+- 빌드 시 본 MVP의 모든 페이지가 `◐ (Cache Components)` 표기로 등록.
 - `cookies()`/`headers()`를 읽는 함수에 `'use cache'`를 적용하지 않는다 (Supabase 클라이언트는 쿠키를 읽으므로 본질적으로 동적).
 
 ### 5.6 라우팅·인증 가드
 
-- `proxy.ts` (Next.js 15 미들웨어 위치, 본 프로젝트는 `lib/supabase/proxy.ts#updateSession`을 호출하는 루트 미들웨어 구성).
+- `proxy.ts` (Next.js 16 proxy 위치, 본 프로젝트는 `lib/supabase/proxy.ts#updateSession`을 호출하는 루트 proxy 구성).
 - 화이트리스트(비로그인 통과): `/`, `/login*`, `/auth*`, `/invite/*`.
 - 그 외 모든 경로는 비로그인 시 `/auth/login`으로 redirect.
 - `createServerClient`와 `getClaims()` 호출 사이에 코드 삽입 금지 — 무작위 로그아웃 버그 방지.
 - `supabaseResponse` 객체 그대로 반환 — 새 response 생성 시 쿠키 복사 필수.
+- **runtime 제약**: Next.js 16의 `proxy.ts`는 **Node.js runtime 전용**으로, Next.js 15의 `middleware.ts`가 Edge runtime을 기본으로 했던 것과 다르다. 외부 의존성이 Edge runtime을 가정한 코드(`crypto` 일부, `fetch`의 일부 옵션 등)였다면 Node.js로 재작성이 필요.
 
 ### 5.7 접근성·반응형
 
@@ -272,7 +273,7 @@ export default async function Page(props) {
 
 | 영역 | 선택 | 비고 |
 | ---- | ---- | ---- |
-| Frontend Framework | Next.js 15 (App Router, PPR, `cacheComponents: true`) | Turbopack 기본 |
+| Frontend Framework | Next.js 16.2.6 (App Router, Cache Components, `cacheComponents: true`) | Turbopack 기본 |
 | React | React 19 (Server Components 기본) | |
 | 언어 | TypeScript (strict) | |
 | 스타일 | Tailwind CSS 3 + shadcn/ui (Radix primitives) | `components/ui/` |
