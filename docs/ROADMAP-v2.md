@@ -12,9 +12,13 @@
 
 학습 목적이라 예제의 4 phase 구조를 그대로 따라가는 것이 default:
 
-- **Phase 1: 애플리케이션 골격 구축** (Task 001~002)
-  - 13개 페이지 라우트 + 빈 껍데기
-  - TypeScript 타입 정의
+- **Phase 1: 애플리케이션 골격 구축** ✅ 완료 (2026-05-24)
+  - 13개 페이지 라우트 빈 껍데기 (모바일 8 + 데스크톱 5)
+  - 모바일 하단 nav + admin 데스크톱 사이드바 layout 컴포넌트
+  - TypeScript 타입 정의 (User · Event · EventParticipant · ApiResult)
+  - Plan: `docs/superpowers/plans/2026-05-24-event-platform-v2-phase1.md`
+  - 회귀: build 24 routes, 0 warnings, lint 0, Playwright sanity 부분 PASS (홈·invite/[code] 컨텐츠 검증 + 보호 라우트 4개 proxy redirect 의도된 동작 — Phase 3 Task 008에서 admin/login whitelist + admin 권한 분기 예정)
+  - Plan 일탈: Cache Components 제약으로 dynamic route 3개에 force-dynamic 시도 → Suspense wrap 패턴(v1.0 app/page.tsx와 동일)으로 정공법 적용
 - **Phase 2: UI/UX 완성 (더미 데이터)** (Task 003~006)
   - 공통 컴포넌트 라이브러리
   - 주최자 모바일 UI (이벤트 생성/관리/공유)
