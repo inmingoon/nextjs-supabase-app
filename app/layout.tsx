@@ -11,9 +11,9 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "모임 관리",
+  title: "1회성 이벤트, 5초 만에",
   description:
-    "카톡 단톡방이 못 푸는 누적 데이터 — 누가 답했나·누가 얼마나 출석했나 — 만 잘 해서 단톡방 옆에 붙여 쓰는 보완 도구",
+    "5~30명 규모 1회성 이벤트(모임·세미나·소규모 행사)를 초대 링크 하나로 만들고 관리할 수 있는 모바일 우선 플랫폼",
 };
 
 const geistSans = Geist({
