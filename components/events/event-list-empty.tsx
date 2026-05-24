@@ -1,38 +1,26 @@
-import Link from "next/link";
-import { CalendarOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-type Action = {
-  label: string;
-  href: string;
-};
+import { Calendar } from "lucide-react";
 
 type Props = {
-  title?: string;
+  title: string;
   description?: string;
-  action?: Action;
+  action?: React.ReactNode;
 };
 
 /**
  * 이벤트 목록 비어있을 때 공용 placeholder.
+ * `action`은 임의의 ReactNode (Button + Link 등)을 받는다.
  */
-export function EventListEmpty({
-  title = "이벤트가 없습니다",
-  description = "아직 등록된 이벤트가 없어요.",
-  action,
-}: Props) {
+export function EventListEmpty({ title, description, action }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-12 text-center">
-      <CalendarOff className="h-10 w-10 text-muted-foreground" />
-      <div className="space-y-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-12 text-center">
+      <Calendar className="h-10 w-10 text-muted-foreground" />
+      <div>
+        <p className="font-medium">{title}</p>
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-      {action ? (
-        <Button asChild variant="default" size="sm">
-          <Link href={action.href}>{action.label}</Link>
-        </Button>
-      ) : null}
+      {action}
     </div>
   );
 }

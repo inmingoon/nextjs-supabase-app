@@ -9,7 +9,7 @@ type Props = {
 
 const STATUS_LABEL: Record<EventStatus, string> = {
   upcoming: "예정",
-  ongoing: "진행중",
+  ongoing: "진행 중",
   completed: "완료",
 };
 

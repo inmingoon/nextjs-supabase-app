@@ -53,8 +53,8 @@ export const DUMMY_USERS: User[] = [
 export const CURRENT_DUMMY_USER: User = DUMMY_USERS[0];
 
 /** id로 더미 사용자 조회 */
-export function getUserById(id: string): User | undefined {
-  return DUMMY_USERS.find((u) => u.id === id);
+export function getUserById(id: string): User | null {
+  return DUMMY_USERS.find((u) => u.id === id) ?? null;
 }
 
 /** role로 더미 사용자 필터 */
