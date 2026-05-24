@@ -39,3 +39,15 @@ export function formatKst(
 export function isPast(iso: string): boolean {
   return new Date(iso).getTime() < Date.now();
 }
+
+/**
+ * UTC ISO 문자열을 KST 날짜만으로 표시 (시간 제외).
+ * 예: "2026-05-23T...Z" → "5월 23일"
+ */
+export function formatKstDate(iso: string): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(iso));
+}
