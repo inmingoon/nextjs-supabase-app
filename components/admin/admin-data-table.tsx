@@ -23,6 +23,7 @@ type Props<T> = {
   items: T[];
   columns: Column<T>[];
   searchKey: (item: T) => string;
+  getRowId: (item: T) => string;
   searchPlaceholder?: string;
   pageSize?: number;
   rowActions?: (item: T) => React.ReactNode;
@@ -32,6 +33,7 @@ export function AdminDataTable<T>({
   items,
   columns,
   searchKey,
+  getRowId,
   searchPlaceholder,
   pageSize = 10,
   rowActions,
@@ -82,8 +84,8 @@ export function AdminDataTable<T>({
                 </TableCell>
               </TableRow>
             ) : (
-              visible.map((item, idx) => (
-                <TableRow key={idx}>
+              visible.map((item) => (
+                <TableRow key={getRowId(item)}>
                   {columns.map((c) => (
                     <TableCell key={c.key}>{c.cell(item)}</TableCell>
                   ))}

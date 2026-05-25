@@ -44,6 +44,9 @@ const COLUMNS: Column<Event>[] = [
   },
 ];
 
+const SEARCH_KEY = (e: Event) => `${e.title} ${e.location}`;
+const GET_ROW_ID = (e: Event) => e.id;
+
 export default function AdminEventsPage() {
   return (
     <div className="space-y-6">
@@ -57,7 +60,8 @@ export default function AdminEventsPage() {
       <AdminDataTable<Event>
         items={DUMMY_EVENTS}
         columns={COLUMNS}
-        searchKey={(e) => `${e.title} ${e.location}`}
+        searchKey={SEARCH_KEY}
+        getRowId={GET_ROW_ID}
         searchPlaceholder="제목 또는 장소 검색..."
         rowActions={(e) => (
           <AdminDeleteConfirm

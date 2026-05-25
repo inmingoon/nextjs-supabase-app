@@ -49,6 +49,9 @@ const COLUMNS: Column<User>[] = [
   },
 ];
 
+const SEARCH_KEY = (u: User) => `${u.fullName ?? ""} ${u.email}`;
+const GET_ROW_ID = (u: User) => u.id;
+
 export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
@@ -62,7 +65,8 @@ export default function AdminUsersPage() {
       <AdminDataTable<User>
         items={DUMMY_USERS}
         columns={COLUMNS}
-        searchKey={(u) => `${u.fullName ?? ""} ${u.email}`}
+        searchKey={SEARCH_KEY}
+        getRowId={GET_ROW_ID}
         searchPlaceholder="이름 또는 이메일 검색..."
         rowActions={(u) => (
           <AdminDeleteConfirm

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
@@ -19,17 +19,25 @@ export function AdminSearchBar({
 }: Props) {
   const [local, setLocal] = useState(value);
 
+  // 외부에서 value가 바뀌면 local과 동기화
   useEffect(() => {
     setLocal(value);
   }, [value]);
 
+  // onChange의 최신 참조를 ref에 보관해 debounce effect의 deps 폭증/stale closure 회피
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // local 변경 → debounce 후 onChange 호출
+  useEffect(() => {
+    if (local === value) return;
     const t = setTimeout(() => {
-      if (local !== value) onChange(local);
+      onChangeRef.current(local);
     }, debounceMs);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [local, debounceMs]);
+  }, [local, value, debounceMs]);
 
   return (
     <div className="relative max-w-sm">
