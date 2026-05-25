@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,20 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import type { User } from "@/types/user";
-
-const profileFormSchema = z.object({
-  fullName: z
-    .string()
-    .min(1, "이름을 입력하세요")
-    .max(50, "이름은 50자 이하여야 합니다"),
-  avatarUrl: z
-    .string()
-    .url("유효한 URL이 아닙니다")
-    .optional()
-    .or(z.literal("")),
-});
-
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
+import { profileFormSchema, type ProfileFormValues } from "./profile-form-schema";
 
 /**
  * 프로필 이름/아바타 수정 폼.

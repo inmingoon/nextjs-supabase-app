@@ -16,7 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { eventFormSchema, type EventFormValues } from "./event-form-schema";
+import { makeEventFormSchema, type EventFormValues } from "./event-form-schema";
 
 type Props = {
   mode: "create" | "edit";
@@ -31,8 +31,9 @@ type Props = {
  */
 export function EventForm({ mode, defaultValues, eventId }: Props) {
   const router = useRouter();
+  const schema = makeEventFormSchema({ enforceFutureDate: mode === "create" });
   const form = useForm<EventFormValues>({
-    resolver: zodResolver(eventFormSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       title: defaultValues?.title ?? "",
       description: defaultValues?.description ?? "",
