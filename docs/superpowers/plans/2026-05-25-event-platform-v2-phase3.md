@@ -2,9 +2,28 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Phase 2의 더미 UI를 별도 Supabase project의 실데이터로 전환한다. DB 스키마·RLS·Google OAuth·admin 권한·Server Action·Realtime 참여자 수·Storage 커버 이미지 업로드·Playwright MCP 통합 테스트까지 완성해 v2.0 1회성 이벤트 플랫폼의 production-grade 골격을 마무리한다.
+> **REVISION 2026-05-25**: 사용자 결정 변경 — spec §2 결정 3("별도 Supabase project")을 폐기하고 **기존 v1.0 project 재사용**. 본 plan의 모든 v2.0 DB 객체는 `v2_` prefix로 v1.0 객체와 분리. 사전 작업(project 생성·env 분기·OAuth 등록)이 모두 SKIP됨. 마이그레이션 폴더도 v1.0과 통합(`supabase/migrations/`).
+>
+> **매핑 표** (본 plan 어디서든 v1.0 충돌이 있는 이름은 prefix 적용):
+> | plan 원본 | 실제 적용 |
+> | --- | --- |
+> | `public.users` | `public.v2_users` |
+> | `public.events` | `public.v2_events` |
+> | `public.event_participants` | `public.v2_event_participants` |
+> | `public.admin_users` | `public.v2_admin_users` |
+> | `public.events_with_status` (view) | `public.v2_events_with_status` |
+> | `public.is_admin(uuid)` | `public.v2_is_admin(uuid)` |
+> | `public.get_event_by_invite_code(text)` | `public.v2_get_event_by_invite_code(text)` |
+> | `public.handle_new_user()` 트리거 | `public.v2_handle_new_user()` (v1.0 profiles 트리거와 병행) |
+> | `supabase/migrations-v2/` 폴더 | `supabase/migrations/` (v1.0과 통합, 파일명 `<timestamp>_v2_*.sql`) |
+> | `NEXT_PUBLIC_SUPABASE_URL_V2` 등 V2 env | 기존 `NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 그대로 |
+> | `event-covers` Storage 버킷 | 그대로 (v1.0 사용 0 — 충돌 없음) |
+>
+> **신규 결정 (REVISION에서 추가)**: v1.0의 `handle_new_user` 트리거가 이미 `auth.users INSERT → public.profiles upsert`를 처리하므로, v2.0은 별도 `v2_handle_new_user` 트리거를 `auth.users`에 추가해 `v2_users`에도 동시 upsert (양쪽 테이블에 동시 채워짐). v1.0 트리거 수정 0건.
 
-**Architecture:** v1.0 자산은 `supabase/migrations/`에 보존하고 v2.0은 별도 Supabase project + `supabase/migrations-v2/` 폴더로 분리한다. Phase 2의 `lib/dummy/*.ts` 헬퍼 시그니처(`getEventById(id): Event | null` 등)를 `lib/queries/*.ts` 모듈로 1:1 교체해 13개 페이지 + 컴포넌트 코드는 그대로 유지한다(swap point 최소화). admin 권한은 별도 `admin_users` 테이블 + RLS 헬퍼 함수로 구현하고, 첫 admin은 사용자 이메일을 하드코딩한 마이그레이션으로 부여한다. `events.status`는 컬럼이 아닌 PostgreSQL view(`events_with_status`)로 동적 계산해 cron 의존성을 제거한다. Server Action으로 모든 mutation(create/update/delete/join)을 처리하고, Realtime은 `event:{id}:participants` 채널로 참여자 수를 구독한다.
+**Goal:** Phase 2의 더미 UI를 기존 v1.0 Supabase project의 실데이터로 전환한다. v2.0 도메인 객체(테이블·view·함수)는 모두 `v2_` prefix로 신설해 v1.0과 같은 schema 안에서 격리한다. DB 스키마·RLS·Google OAuth(v1.0 재사용)·admin 권한·Server Action·Realtime 참여자 수·Storage 커버 이미지 업로드·Playwright MCP 통합 테스트까지 완성해 v2.0 1회성 이벤트 플랫폼의 production-grade 골격을 마무리한다.
+
+**Architecture:** v1.0과 같은 Supabase project + 같은 `public` schema 위에 `v2_` prefix로 신규 테이블 4개·view 1개·함수 2개·트리거 1개를 신설한다. v1.0 마이그레이션 7개는 보존, v2.0 마이그레이션은 같은 `supabase/migrations/` 폴더에 `<timestamp>_v2_*.sql` 파일명으로 추가해 CLI 자동 인식. Phase 2의 `lib/dummy/*.ts` 헬퍼 시그니처(`getEventById(id): Event | null` 등)를 `lib/queries/*.ts` 모듈로 1:1 교체해 13개 페이지 + 컴포넌트 코드는 그대로 유지한다(swap point 최소화). admin 권한은 별도 `v2_admin_users` 테이블 + `v2_is_admin` RLS 헬퍼 함수로 구현하고, 첫 admin은 사용자 이메일을 하드코딩한 마이그레이션으로 부여한다. `events.status`는 컬럼이 아닌 PostgreSQL view(`v2_events_with_status`)로 동적 계산해 cron 의존성을 제거한다. Server Action으로 모든 mutation(create/update/delete/join)을 처리하고, Realtime은 `event:{id}:participants` 채널로 `v2_event_participants` 변경을 구독한다.
 
 **Tech Stack:** Next.js 16.2.6 (App Router + Cache Components + Server Action) · React 19 · TypeScript 5.9.3 · Tailwind v3.4.19 · shadcn/ui · @supabase/supabase-js ^2.106 · @supabase/ssr ^0.10 · Supabase Storage (event-covers 버킷) · Supabase Realtime · PostgreSQL view (status 자동 계산) · Postgres RLS 헬퍼 함수 (3중 안전장치 — language plpgsql + SET LOCAL row_security OFF + owner postgres) · crypto.randomBytes (invite_code 32B base64url) · Playwright MCP (E2E)
 
@@ -22,7 +41,7 @@
 | 2 | `events.status` 자동 관리 | **PostgreSQL view (`events_with_status`)** | cron 없이 항상 정확. `event_date` 비교 동적 계산. status 컬럼 제거 후 view에서 계산 → 라이브 변경 즉시 반영. |
 | 3 | 첫 admin 부여 흐름 | **하드코딩 마이그레이션** (`controllercenter2025@gmail.com`) | deterministic + repeatable. dev/staging 일관. SECURITY DEFINER 함수가 auth.users에서 email로 id 조회 후 admin_users INSERT. production 진입 시 환경변수 분기 가능. |
 | 4 | 더미 시드 데이터 | **별도 dev-only 마이그레이션** (`0006_seed_dev_data.sql`) | Phase 2 lib/dummy 데이터(e-001~e-010, u-001~u-005)와 일관성 유지. admin 차트 다양성 확보. production 마이그레이션은 시드 미포함(파일명 prefix로 분기). |
-| 5 | v2.0 마이그레이션 폴더 | **`supabase/migrations-v2/`** | v1.0 main의 `supabase/migrations/`와 분리 보존. v2.0은 별도 Supabase project를 link. SQL Editor 수동 실행 또는 `supabase db push --include-all`. |
+| 5 | v2.0 마이그레이션 폴더 | **`supabase/migrations/` 통합** (REVISION) | v1.0과 같은 project 재사용 → 폴더 분리 무의미. CLI 자동 인식. 파일명 `<timestamp>_v2_*.sql`로 의미 분리. |
 | 6 | dummy → server fetch 교체 패턴 | **헬퍼 시그니처 보존, body만 server fetch로 교체** | page·component 변경 0 목표. 함수명·반환 타입 유지(`Event[]`·`User \| null` 등). `async` 추가만. lib/dummy/ 폐기 후 lib/queries/ 신설. |
 | 7 | 인증 가드 위치 | **proxy.ts whitelist + admin layout server guard** | proxy = 외곽 게이트 (login·invite·callback·confirm whitelist 외 redirect). admin role 검증 = `app/admin/layout.tsx`에서 `await requireAdmin()` 호출. |
 | 8 | Server Action 위치 | **`lib/actions/*.ts`** (도메인별 분리) | `"use server"` 디렉티브. createEvent/updateEvent/deleteEvent/joinEvent/admin-delete 등 도메인별 파일. Zod schema는 client form과 동일 모듈 재사용. |
@@ -44,17 +63,18 @@ lib/dummy/                       (Phase 2 더미 데이터 — 폐기, lib/queri
 └── participants.ts
 ```
 
-### 신규 — DB 마이그레이션 (Task 1)
+### 신규 — DB 마이그레이션 (Task 1) — REVISION 적용
 
 ```
-supabase/migrations-v2/
-├── 0001_create_users_events_participants.sql
-├── 0002_create_admin_users.sql
-├── 0003_create_rls_policies.sql
-├── 0004_create_events_with_status_view.sql
-├── 0005_create_storage_event_covers.sql
-├── 0006_seed_dev_data.sql          (dev only — file prefix로 분기)
-└── 0007_grant_first_admin.sql      (controllercenter2025@gmail.com)
+supabase/migrations/          (v1.0 폴더와 통합, v1.0 7개는 보존)
+├── 20260520*~20260524*.sql       (v1.0 7개 — 보존)
+├── 20260525000000_v2_create_users_events_participants.sql
+├── 20260525000001_v2_create_admin_users.sql
+├── 20260525000002_v2_create_rls_policies.sql
+├── 20260525000003_v2_create_events_with_status_view.sql
+├── 20260525000004_v2_create_storage_event_covers.sql
+├── 20260525000005_v2_seed_dev_data.sql              (dev only)
+└── 20260525000006_v2_grant_first_admin.sql          (controllercenter2025@gmail.com)
 ```
 
 ### 신규 — 데이터 액세스 + 인증 + Server Action (Task 2·3·4·5·6)
@@ -147,90 +167,69 @@ Expected:
 - HEAD: `be4db91 fix(v2): Phase 2.1 final reviewer 권고 3건 (다크모드 차트 + KST TODO)` (또는 그 뒤 commit)
 - working tree: untracked만 OK
 
-- [ ] **사전 1: 새 Supabase project 생성 (사용자 web UI 작업 필요)**
+- [x] ~~**사전 1: 새 Supabase project 생성**~~ — REVISION으로 SKIP. 기존 v1.0 project 재사용.
 
-사용자가 Supabase Dashboard에서 직접 작업:
+- [x] ~~**사전 2: 환경변수 파일 분기**~~ — REVISION으로 SKIP. 기존 `NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 그대로. `lib/supabase/{client,server,proxy}.ts` 정정 step은 Task 2에서 제거.
 
-1. https://supabase.com/dashboard 접속
-2. "New project" 클릭
-3. Project name: `nextjs-supabase-app-v2` (또는 사용자 선호)
-4. Database password 생성 + 저장
-5. Region: `Northeast Asia (Seoul)` (KST 사용자에 최적)
-6. 생성 완료 대기 (~2분)
-7. Project URL + anon key + service_role key 확보 → controller에게 전달
+- [x] ~~**사전 3: Supabase CLI link**~~ — REVISION으로 SKIP (v1.0 이미 link 가정).
 
-> 이 step은 controller가 자동화 불가. 사용자가 수동 완료 후 결과 7항목을 controller에게 알려주면 plan 진행.
+- [x] ~~**사전 4: Google OAuth Provider 등록**~~ — REVISION으로 SKIP. v1.0이 이미 등록한 Google OAuth Provider 그대로 활용. Site URL·redirect URI도 동일 (이미 `http://localhost:3000` + `<v1-ref>.supabase.co/auth/v1/callback` 등록됨).
 
-- [ ] **사전 2: 환경변수 파일 분기**
-
-`.env.local`에 v2.0 변수 추가 (v1.0 변수는 보존):
-
-```
-# v2.0 (별도 project)
-NEXT_PUBLIC_SUPABASE_URL_V2=<v2.0 project URL>
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_V2=<v2.0 anon key>
-SUPABASE_SERVICE_ROLE_KEY_V2=<v2.0 service_role key>
-```
-
-> v1.0 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)는 그대로 유지. v2.0 branch에서는 `_V2` 접미사 변수를 사용. Phase 3.5 Vercel 배포 시 별도 project 환경변수만 등록.
-
-`lib/supabase/client.ts`·`server.ts`·`proxy.ts`의 `process.env.NEXT_PUBLIC_SUPABASE_URL` → `process.env.NEXT_PUBLIC_SUPABASE_URL_V2`로 일괄 교체(Task 2 Step 0에서).
-
-- [ ] **사전 3: Supabase CLI link (선택)**
+- [ ] **사전 5 (신규): v1.0 project 정상 동작 확인**
 
 ```bash
-npx supabase login
-npx supabase link --project-ref <v2.0 project ref>
+# .env.local의 기존 변수 확인
+grep -E "^NEXT_PUBLIC_SUPABASE_URL=" .env.local
+grep -E "^NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=" .env.local
+
+# 빌드가 깨지지 않는지
+npm run build 2>&1 | tail -10
 ```
 
-> 마이그레이션 push 용도. 사용자가 익숙하지 않으면 SQL Editor 수동 실행도 가능 (각 마이그레이션 파일을 복붙).
+Expected:
+- 두 env 변수 모두 채워져 있음
+- 빌드 성공
+- v1.0 project가 dev에서 정상 응답 (선택: `npm run dev` 후 `/` 페이지 200 확인)
 
-- [ ] **사전 4: Google OAuth Provider 등록 (사용자 web UI 작업 필요)**
-
-사용자가 Google Cloud Console + Supabase Dashboard에서 작업:
-
-1. Google Cloud Console에서 새 OAuth 2.0 Client ID 생성 (Web application)
-2. Authorized redirect URI: `https://<v2.0-project-ref>.supabase.co/auth/v1/callback`
-3. Client ID + Client Secret 복사
-4. Supabase Dashboard → Authentication → Providers → Google 활성화 후 Client ID·Secret 입력
-5. Site URL 설정: `http://localhost:3000` (dev), 추후 Vercel URL 추가
-
-> v1.0 OAuth는 v1.0 project에 등록되어 있고 v2.0은 별도 client 등록 필요.
+위 조건 모두 PASS이면 Task 1로 즉시 진행 가능.
 
 ---
 
-## Task 1: v2.0 Supabase project DB 스키마 + RLS + Storage 마이그레이션 (예제 Task 007 전반)
+## Task 1: v2.0 DB 스키마 + RLS + Storage 마이그레이션 (예제 Task 007 전반) — REVISION 적용
 
-> 본 task가 가장 길고 중요하다. 이후 모든 task가 본 마이그레이션 결과에 의존.
+> 본 task가 가장 길고 중요하다. 이후 모든 task가 본 마이그레이션 결과에 의존. **REVISION: 기존 v1.0 project 재사용 + 모든 객체에 `v2_` prefix.**
 
-**Files:**
-- Create: `supabase/migrations-v2/0001_create_users_events_participants.sql`
-- Create: `supabase/migrations-v2/0002_create_admin_users.sql`
-- Create: `supabase/migrations-v2/0003_create_rls_policies.sql`
-- Create: `supabase/migrations-v2/0004_create_events_with_status_view.sql`
-- Create: `supabase/migrations-v2/0005_create_storage_event_covers.sql`
-- Create: `supabase/migrations-v2/0006_seed_dev_data.sql`
-- Create: `supabase/migrations-v2/0007_grant_first_admin.sql`
+**Files (모두 `supabase/migrations/` 폴더에 — v1.0과 통합, 파일명에 `v2_` 의미 분리):**
+- Create: `supabase/migrations/20260525000000_v2_create_users_events_participants.sql`
+- Create: `supabase/migrations/20260525000001_v2_create_admin_users.sql`
+- Create: `supabase/migrations/20260525000002_v2_create_rls_policies.sql`
+- Create: `supabase/migrations/20260525000003_v2_create_events_with_status_view.sql`
+- Create: `supabase/migrations/20260525000004_v2_create_storage_event_covers.sql`
+- Create: `supabase/migrations/20260525000005_v2_seed_dev_data.sql`
+- Create: `supabase/migrations/20260525000006_v2_grant_first_admin.sql`
 
-### Step 1: 마이그레이션 폴더 생성
+### Step 1: ~~마이그레이션 폴더 생성~~ — REVISION으로 SKIP
+
+기존 `supabase/migrations/` 폴더 사용. v1.0 마이그레이션 7개와 v2.0 마이그레이션 7개가 같은 폴더에 timestamp 순으로 존재.
 
 ```bash
-mkdir -p supabase/migrations-v2
+ls supabase/migrations/   # 기존 7개 확인
 ```
 
-Expected: 폴더 생성 성공. v1.0 `supabase/migrations/`는 그대로 보존.
+Expected: v1.0 7개 파일 (`20260520*` ~ `20260524*`) 존재.
 
-### Step 2: `0001_create_users_events_participants.sql` — 3 테이블 + 인덱스
+### Step 2: `20260525000000_v2_create_users_events_participants.sql` — 3 테이블 + 인덱스
 
 Create:
 
 ```sql
 -- =============================================================================
--- v2.0 Phase 3 Task 007 — 핵심 도메인 테이블 (users · events · event_participants)
+-- v2.0 Phase 3 Task 007 — 핵심 도메인 테이블 (v2_users · v2_events · v2_event_participants)
+-- REVISION: v1.0 project 재사용. 모든 객체에 v2_ prefix.
 -- =============================================================================
 
--- public.users: auth.users 확장 프로필
-create table public.users (
+-- public.v2_users: auth.users 확장 프로필 (v1.0 public.profiles와 별개)
+create table public.v2_users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique not null,
   full_name text,
@@ -239,10 +238,10 @@ create table public.users (
   updated_at timestamptz default now() not null
 );
 
-comment on table public.users is 'auth.users 확장 프로필. role 컬럼은 별도 admin_users 테이블로 분리(spec §4 결정 B).';
+comment on table public.v2_users is 'v2.0 1회성 이벤트 도메인 사용자 프로필. v1.0 profiles와 별개. role은 v2_admin_users 테이블로 분리 (spec §4 결정 B).';
 
--- public.events: 1회성 이벤트
-create table public.events (
+-- public.v2_events: 1회성 이벤트 (v1.0 events는 회차 — 별개)
+create table public.v2_events (
   id uuid primary key default gen_random_uuid(),
   title text not null check (char_length(title) between 1 and 100),
   description text check (char_length(description) <= 1000),
@@ -250,56 +249,48 @@ create table public.events (
   event_date timestamptz not null,
   location text not null check (char_length(location) between 1 and 200),
   invite_code text unique not null,
-  created_by uuid not null references public.users(id) on delete cascade,
+  created_by uuid not null references public.v2_users(id) on delete cascade,
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );
 
-comment on column public.events.invite_code is 'crypto.randomBytes(32).toString("base64url"). UNIQUE 제약 + Server Action에서 충돌 시 재시도.';
-comment on column public.events.event_date is 'UTC 저장 (timestamptz). KST 입력은 클라이언트가 kstDateTimeLocalToIso로 변환 후 전달.';
+comment on table public.v2_events is 'v2.0 1회성 이벤트. v1.0 events(회차)와 prefix로 분리.';
+comment on column public.v2_events.invite_code is 'crypto.randomBytes(32).toString("base64url"). UNIQUE 제약 + Server Action에서 충돌 시 재시도.';
+comment on column public.v2_events.event_date is 'UTC 저장 (timestamptz). KST 입력은 클라이언트가 kstDateTimeLocalToIso로 변환 후 전달.';
 
--- status 컬럼은 view에서 계산 (0004 참조). 테이블에는 저장 안 함.
+-- status 컬럼은 view(v2_events_with_status)에서 계산. 테이블에는 저장 안 함.
 
--- public.event_participants: 참여 관계 (composite key)
-create table public.event_participants (
-  event_id uuid not null references public.events(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade,
+-- public.v2_event_participants: 참여 관계 (composite key)
+create table public.v2_event_participants (
+  event_id uuid not null references public.v2_events(id) on delete cascade,
+  user_id uuid not null references public.v2_users(id) on delete cascade,
   joined_at timestamptz default now() not null,
   primary key (event_id, user_id)
 );
 
--- 인덱스
-create index events_invite_code_idx on public.events(invite_code);
-create index events_created_by_idx on public.events(created_by);
-create index events_event_date_idx on public.events(event_date);
-create index event_participants_user_id_idx on public.event_participants(user_id);
+-- 인덱스 (이름에도 v2_ prefix — 같은 schema 내 unique 필요)
+create index v2_events_invite_code_idx on public.v2_events(invite_code);
+create index v2_events_created_by_idx on public.v2_events(created_by);
+create index v2_events_event_date_idx on public.v2_events(event_date);
+create index v2_event_participants_user_id_idx on public.v2_event_participants(user_id);
 
--- updated_at 자동 갱신 트리거
-create or replace function public.handle_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create trigger users_updated_at before update on public.users
+-- v1.0 public.handle_updated_at() 함수는 이미 존재 → 재사용 (정의 안 함).
+-- updated_at 자동 갱신 트리거만 추가
+create trigger v2_users_updated_at before update on public.v2_users
   for each row execute function public.handle_updated_at();
 
-create trigger events_updated_at before update on public.events
+create trigger v2_events_updated_at before update on public.v2_events
   for each row execute function public.handle_updated_at();
 
--- auth.users INSERT 시 public.users 자동 생성 트리거
-create or replace function public.handle_new_user()
+-- auth.users INSERT 시 v2_users 자동 생성 (v1.0의 handle_new_user는 profiles 처리 — 병행 실행)
+create or replace function public.v2_handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
-  insert into public.users (id, email, full_name, avatar_url)
+  insert into public.v2_users (id, email, full_name, avatar_url)
   values (
     new.id,
     new.email,
@@ -311,14 +302,14 @@ begin
 end;
 $$;
 
-create trigger on_auth_user_created
+create trigger on_auth_user_created_v2
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row execute function public.v2_handle_new_user();
 
--- RLS 활성화 (정책은 0003에서)
-alter table public.users enable row level security;
-alter table public.events enable row level security;
-alter table public.event_participants enable row level security;
+-- RLS 활성화 (정책은 v2_create_rls_policies 마이그레이션에서)
+alter table public.v2_users enable row level security;
+alter table public.v2_events enable row level security;
+alter table public.v2_event_participants enable row level security;
 ```
 
 설명:
@@ -327,31 +318,31 @@ alter table public.event_participants enable row level security;
 - `handle_new_user` 트리거 — Google OAuth 콜백 시 `public.users`에 자동 upsert. `raw_user_meta_data`에서 `full_name`/`avatar_url` 추출.
 - `security definer + search_path = public` — RLS 헬퍼 함수 안전 패턴(v1.0 학습 자산 재사용).
 
-### Step 3: `0002_create_admin_users.sql` — admin 부여 테이블 + RLS 헬퍼 함수
+### Step 3: `20260525000001_v2_create_admin_users.sql` — admin 부여 테이블 + RLS 헬퍼 함수
 
 Create:
 
 ```sql
 -- =============================================================================
--- v2.0 Phase 3 Task 007 — admin_users 테이블 (spec §4 결정 B)
+-- v2.0 Phase 3 Task 007 — v2_admin_users 테이블 (spec §4 결정 B)
 -- =============================================================================
 
-create table public.admin_users (
-  id uuid primary key references public.users(id) on delete cascade,
-  granted_by uuid references public.users(id) on delete set null,
+create table public.v2_admin_users (
+  id uuid primary key references public.v2_users(id) on delete cascade,
+  granted_by uuid references public.v2_users(id) on delete set null,
   granted_at timestamptz default now() not null,
   reason text
 );
 
-comment on table public.admin_users is 'admin role 부여 기록. self-promote 불가(RLS DENY ALL except service_role). 첫 admin은 0007 마이그레이션이 부여.';
+comment on table public.v2_admin_users is 'v2.0 admin role 부여 기록. self-promote 불가(RLS DENY ALL except service_role). 첫 admin은 v2_grant_first_admin 마이그레이션이 부여.';
 
-alter table public.admin_users enable row level security;
+alter table public.v2_admin_users enable row level security;
 
--- admin 본인 + admin인 사람만 SELECT
+-- v2_admin 본인 + admin인 사람만 SELECT
 -- INSERT/UPDATE/DELETE는 service_role 또는 마이그레이션에서만 (RLS 정책 없음 = DENY)
 
--- RLS 헬퍼 함수: 현재 사용자가 admin인지 (3중 안전장치)
-create or replace function public.is_admin(target_user_id uuid)
+-- RLS 헬퍼 함수: 현재 사용자가 v2.0 admin인지 (3중 안전장치)
+create or replace function public.v2_is_admin(target_user_id uuid)
 returns boolean
 language plpgsql
 security definer
@@ -364,22 +355,22 @@ begin
   -- SET LOCAL row_security TO OFF는 함수 내부 쿼리가 RLS 우회하도록
   set local row_security = off;
   select exists (
-    select 1 from public.admin_users where id = target_user_id
+    select 1 from public.v2_admin_users where id = target_user_id
   ) into result;
   return result;
 end;
 $$;
 
-comment on function public.is_admin(uuid) is 'RLS 정책에서 admin 권한 체크 시 사용. SECURITY DEFINER + row_security OFF로 admin_users에 RLS 무한 재귀 없이 접근.';
+comment on function public.v2_is_admin(uuid) is 'v2.0 RLS 정책에서 admin 권한 체크 시 사용. SECURITY DEFINER + row_security OFF로 v2_admin_users에 RLS 무한 재귀 없이 접근.';
 
 -- 함수 권한: authenticated만 EXECUTE
-revoke execute on function public.is_admin(uuid) from public;
-grant execute on function public.is_admin(uuid) to authenticated;
+revoke execute on function public.v2_is_admin(uuid) from public;
+grant execute on function public.v2_is_admin(uuid) to authenticated;
 
 -- admin이 자기 자신 + 다른 admin 정보 조회 가능
-create policy admin_users_select_admin_only on public.admin_users
+create policy v2_admin_users_select_admin_only on public.v2_admin_users
   for select to authenticated
-  using (public.is_admin(auth.uid()));
+  using (public.v2_is_admin(auth.uid()));
 ```
 
 설명:
@@ -388,84 +379,72 @@ create policy admin_users_select_admin_only on public.admin_users
 - `stable` 마커 — 같은 트랜잭션 내 동일 입력은 캐싱 (성능).
 - INSERT/UPDATE/DELETE 정책 없음 → 사용자 self-promote 불가. 마이그레이션 또는 service_role API만 부여.
 
-### Step 4: `0003_create_rls_policies.sql` — RLS 정책 정의
+### Step 4: `20260525000002_v2_create_rls_policies.sql` — RLS 정책 정의
 
 Create:
 
 ```sql
 -- =============================================================================
--- v2.0 Phase 3 Task 007 — RLS 정책 (spec §5 high-level 매트릭스 구현)
+-- v2.0 Phase 3 Task 007 — RLS 정책 (spec §5 high-level 매트릭스 구현, v2_ prefix)
 -- =============================================================================
 
--- ============================ users 테이블 ============================
--- SELECT: 본인 + admin
-create policy users_select_self_or_admin on public.users
+-- ============================ v2_users 테이블 ============================
+create policy v2_users_select_self_or_admin on public.v2_users
   for select to authenticated
-  using (auth.uid() = id or public.is_admin(auth.uid()));
+  using (auth.uid() = id or public.v2_is_admin(auth.uid()));
 
--- UPDATE: 본인 (admin은 별도 service_role API로 처리, 학습 단계는 미구현)
-create policy users_update_self on public.users
+create policy v2_users_update_self on public.v2_users
   for update to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
--- DELETE: admin만
-create policy users_delete_admin_only on public.users
+create policy v2_users_delete_admin_only on public.v2_users
   for delete to authenticated
-  using (public.is_admin(auth.uid()));
+  using (public.v2_is_admin(auth.uid()));
 
--- INSERT: handle_new_user 트리거가 처리. 명시적 정책 없음(RLS bypass via SECURITY DEFINER).
+-- INSERT: v2_handle_new_user 트리거가 처리. 명시적 정책 없음.
 
--- ============================ events 테이블 ============================
--- SELECT: 모든 인증 사용자 (publicly listable)
-create policy events_select_all_authenticated on public.events
+-- ============================ v2_events 테이블 ============================
+create policy v2_events_select_all_authenticated on public.v2_events
   for select to authenticated
   using (true);
 
--- SELECT: 비인증 사용자도 invite_code로 단일 이벤트 조회 가능 (anon 정책)
-create policy events_select_by_invite_anon on public.events
-  for select to anon
-  using (invite_code = current_setting('request.headers', true)::jsonb->>'x-invite-code');
+-- 비인증 invite 페이지는 v2_get_event_by_invite_code SECURITY DEFINER 함수로 우회.
+-- anon SELECT 정책 불필요.
 
--- INSERT: 인증된 사용자 (created_by = 본인 강제)
-create policy events_insert_authenticated on public.events
+create policy v2_events_insert_authenticated on public.v2_events
   for insert to authenticated
   with check (auth.uid() = created_by);
 
--- UPDATE: 주최자 또는 admin
-create policy events_update_owner_or_admin on public.events
+create policy v2_events_update_owner_or_admin on public.v2_events
   for update to authenticated
-  using (auth.uid() = created_by or public.is_admin(auth.uid()))
-  with check (auth.uid() = created_by or public.is_admin(auth.uid()));
+  using (auth.uid() = created_by or public.v2_is_admin(auth.uid()))
+  with check (auth.uid() = created_by or public.v2_is_admin(auth.uid()));
 
--- DELETE: 주최자 또는 admin
-create policy events_delete_owner_or_admin on public.events
+create policy v2_events_delete_owner_or_admin on public.v2_events
   for delete to authenticated
-  using (auth.uid() = created_by or public.is_admin(auth.uid()));
+  using (auth.uid() = created_by or public.v2_is_admin(auth.uid()));
 
--- ============================ event_participants 테이블 ============================
--- SELECT: 이벤트 주최자 + 본인 + admin (다른 참여자도 봐야 하므로 broad)
-create policy event_participants_select on public.event_participants
+-- ============================ v2_event_participants 테이블 ============================
+create policy v2_event_participants_select on public.v2_event_participants
   for select to authenticated
   using (
     auth.uid() = user_id
-    or exists (select 1 from public.events e where e.id = event_id and e.created_by = auth.uid())
-    or public.is_admin(auth.uid())
-    or exists (select 1 from public.event_participants p where p.event_id = event_participants.event_id and p.user_id = auth.uid())
+    or exists (select 1 from public.v2_events e where e.id = event_id and e.created_by = auth.uid())
+    or public.v2_is_admin(auth.uid())
+    or exists (select 1 from public.v2_event_participants p where p.event_id = v2_event_participants.event_id and p.user_id = auth.uid())
   );
 
--- INSERT: 본인이 참여 (중복은 PRIMARY KEY가 차단)
-create policy event_participants_insert_self on public.event_participants
+create policy v2_event_participants_insert_self on public.v2_event_participants
   for insert to authenticated
   with check (auth.uid() = user_id);
 
--- DELETE: 본인 또는 이벤트 주최자 또는 admin
-create policy event_participants_delete on public.event_participants
+create policy v2_event_participants_delete on public.v2_event_participants
   for delete to authenticated
   using (
     auth.uid() = user_id
-    or exists (select 1 from public.events e where e.id = event_id and e.created_by = auth.uid())
-    or public.is_admin(auth.uid())
+    or exists (select 1 from public.v2_events e where e.id = event_id and e.created_by = auth.uid())
+    or public.v2_is_admin(auth.uid())
   );
 ```
 
@@ -474,21 +453,16 @@ create policy event_participants_delete on public.event_participants
 - `event_participants_select`의 참여자 4중 조건 — 본인 / 주최자 / admin / 같은 이벤트 참여자. spec §5 그대로.
 - UPDATE 정책에 `with check` 추가 — owner 변경 시도 차단.
 
-### Step 5: `0004_create_events_with_status_view.sql` — status 자동 계산 view + 보조 함수
+### Step 5: `20260525000003_v2_create_events_with_status_view.sql` — status 자동 계산 view + 보조 함수
 
 Create:
 
 ```sql
 -- =============================================================================
--- v2.0 Phase 3 Task 007 — events_with_status view (spec §5 결정 2)
+-- v2.0 Phase 3 Task 007 — v2_events_with_status view (spec §5 결정 2)
 -- =============================================================================
 
--- status 컬럼 대신 view로 동적 계산
--- upcoming: event_date > now()
--- ongoing: event_date BETWEEN now() - interval '4 hours' AND now() (4시간 윈도우)
--- completed: event_date < now() - interval '4 hours'
-
-create or replace view public.events_with_status as
+create or replace view public.v2_events_with_status as
 select
   e.*,
   case
@@ -496,42 +470,42 @@ select
     when e.event_date > now() - interval '4 hours' then 'ongoing'
     else 'completed'
   end::text as status
-from public.events e;
+from public.v2_events e;
 
-comment on view public.events_with_status is 'events 테이블 + status 동적 계산 컬럼. RLS는 events 정책을 통해 자동 적용(view는 underlying table 정책 상속).';
+comment on view public.v2_events_with_status is 'v2_events + status 동적 계산. RLS는 v2_events 정책을 통해 자동 적용.';
 
--- view 권한: authenticated 읽기 가능
-grant select on public.events_with_status to authenticated, anon;
+grant select on public.v2_events_with_status to authenticated, anon;
 
 -- ============================ invite_code 조회 함수 (anon 지원) ============================
 
--- invite/[code] 페이지(비로그인 OK)에서 사용
-create or replace function public.get_event_by_invite_code(p_code text)
-returns public.events_with_status
+create or replace function public.v2_get_event_by_invite_code(p_code text)
+returns public.v2_events_with_status
 language plpgsql
 security definer
 set search_path = public
 stable
 as $$
 declare
-  result public.events_with_status;
+  result public.v2_events_with_status;
 begin
   set local row_security = off;
-  select * into result from public.events_with_status where invite_code = p_code limit 1;
+  select * into result from public.v2_events_with_status where invite_code = p_code limit 1;
   return result;
 end;
 $$;
 
-comment on function public.get_event_by_invite_code(text) is '비로그인 사용자도 초대 코드로 단일 이벤트 미리보기 가능. RLS bypass via SECURITY DEFINER.';
+comment on function public.v2_get_event_by_invite_code(text) is '비로그인 사용자도 초대 코드로 단일 v2_event 미리보기. RLS bypass via SECURITY DEFINER.';
 
-grant execute on function public.get_event_by_invite_code(text) to anon, authenticated;
+grant execute on function public.v2_get_event_by_invite_code(text) to anon, authenticated;
 ```
 
 설명:
 - 4시간 ongoing 윈도우 — 이벤트는 일반적으로 1~4시간. 본 plan은 4시간으로 고정. 추후 events 테이블에 `duration_hours` 컬럼 추가 시 dynamic화 가능(v2.x).
 - `get_event_by_invite_code` SECURITY DEFINER — invite RLS 정책의 `current_setting` 패턴보다 안전·단순.
 
-### Step 6: `0005_create_storage_event_covers.sql` — event-covers 버킷 + RLS
+### Step 6: `20260525000004_v2_create_storage_event_covers.sql` — event-covers 버킷 + RLS
+
+> 버킷명 `event-covers` 그대로 (v1.0 Storage 사용 0 — 충돌 없음). RLS 정책 이름과 참조 테이블만 v2_ prefix.
 
 Create:
 
@@ -540,47 +514,43 @@ Create:
 -- v2.0 Phase 3 Task 007 — event-covers Storage 버킷 (spec §3)
 -- =============================================================================
 
--- Storage 버킷 생성 (public read)
 insert into storage.buckets (id, name, public)
 values ('event-covers', 'event-covers', true)
 on conflict (id) do nothing;
 
--- RLS 정책
--- INSERT: 이벤트 주최자만 (file path: events/{event_id}/cover.{ext})
-create policy event_covers_insert_owner on storage.objects
+-- INSERT: v2_events 주최자만 (file path: events/{event_id}/cover.{ext})
+create policy v2_event_covers_insert_owner on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'event-covers'
     and exists (
-      select 1 from public.events e
+      select 1 from public.v2_events e
       where e.created_by = auth.uid()
       and (storage.foldername(name))[1] = 'events'
       and (storage.foldername(name))[2] = e.id::text
     )
   );
 
--- UPDATE: 이벤트 주최자만
-create policy event_covers_update_owner on storage.objects
+create policy v2_event_covers_update_owner on storage.objects
   for update to authenticated
   using (
     bucket_id = 'event-covers'
     and exists (
-      select 1 from public.events e
+      select 1 from public.v2_events e
       where e.created_by = auth.uid()
       and (storage.foldername(name))[1] = 'events'
       and (storage.foldername(name))[2] = e.id::text
     )
   );
 
--- DELETE: 이벤트 주최자 또는 admin
-create policy event_covers_delete_owner_or_admin on storage.objects
+create policy v2_event_covers_delete_owner_or_admin on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'event-covers'
     and (
-      public.is_admin(auth.uid())
+      public.v2_is_admin(auth.uid())
       or exists (
-        select 1 from public.events e
+        select 1 from public.v2_events e
         where e.created_by = auth.uid()
         and (storage.foldername(name))[1] = 'events'
         and (storage.foldername(name))[2] = e.id::text
@@ -588,14 +558,14 @@ create policy event_covers_delete_owner_or_admin on storage.objects
     )
   );
 
--- SELECT: public (bucket이 public이므로 자동, 명시 불필요)
+-- SELECT: bucket이 public이므로 자동.
 ```
 
 설명:
 - `storage.foldername(name)` — path를 `/`로 split. `events/{uuid}/cover.jpg` → `['events', '{uuid}', 'cover.jpg']`.
 - INSERT는 이벤트가 이미 존재해야 가능 → 새 이벤트 생성 시 row INSERT 후 storage upload (Task 4 순서).
 
-### Step 7: `0006_seed_dev_data.sql` — 더미 시드 (dev only)
+### Step 7: `20260525000005_v2_seed_dev_data.sql` — 더미 시드 (dev only)
 
 Create:
 
@@ -637,90 +607,97 @@ Create:
 - 학습 흐름: 사용자가 dev에서 5번 Google OAuth 로그인 → 5 user_id 확보 → controller에게 전달 → controller가 0006_seed_dev_data.sql을 사용자 ID로 채워 INSERT.
 - 대체 옵션: production 가입 흐름을 dev에서 그대로 수행 후 admin 화면에서 직접 INSERT. 학습 가치 더 높음 — 본 plan은 두 옵션 모두 명시.
 
-### Step 8: `0007_grant_first_admin.sql` — 첫 admin 부여 (controllercenter2025@gmail.com)
+### Step 8: `20260525000006_v2_grant_first_admin.sql` — 첫 admin 부여 (controllercenter2025@gmail.com)
 
 Create:
 
 ```sql
 -- =============================================================================
--- v2.0 Phase 3 Task 007 — 첫 admin 부여 (spec §4 결정 3 하드코딩)
+-- v2.0 Phase 3 Task 007 — 첫 v2_admin 부여 (spec §4 결정 3 하드코딩)
 -- =============================================================================
-
--- 사용자 이메일로 auth.users에서 id 조회 후 admin_users INSERT.
--- 사용자가 아직 가입하지 않았으면 본 마이그레이션은 INSERT 실패가 아닌 NOTICE 출력 후 skip.
--- 사용자 가입 후 본 마이그레이션을 다시 실행하면 admin 권한 부여.
 
 do $$
 declare
   target_email text := 'controllercenter2025@gmail.com';
   target_uid uuid;
 begin
-  -- auth.users에서 email로 uuid 조회 (SECURITY DEFINER 함수 안에서만 가능하지만 마이그레이션은 superuser 권한)
   select id into target_uid from auth.users where email = target_email limit 1;
 
   if target_uid is null then
-    raise notice 'First admin email % not registered yet. Re-run this migration after user signs up via Google OAuth.', target_email;
+    raise notice 'First v2 admin email % not registered yet. Re-run this migration after user signs up via Google OAuth.', target_email;
   else
-    insert into public.admin_users (id, granted_by, reason)
-    values (target_uid, target_uid, 'First admin — bootstrapped via migration 0007')
+    -- v2_users에도 row 있어야 FK 충족 (v2_handle_new_user 트리거가 INSERT 이후 자동 처리하지만, 사용자가 트리거 이전 가입한 경우 대비)
+    insert into public.v2_users (id, email)
+    values (target_uid, target_email)
     on conflict (id) do nothing;
 
-    raise notice 'First admin granted: %', target_email;
+    insert into public.v2_admin_users (id, granted_by, reason)
+    values (target_uid, target_uid, 'First v2 admin — bootstrapped via v2_grant_first_admin migration')
+    on conflict (id) do nothing;
+
+    raise notice 'First v2 admin granted: %', target_email;
   end if;
 end;
 $$;
 ```
 
 설명:
+- v2_users INSERT을 먼저 (FK 충족 보장). v2_handle_new_user 트리거가 이미 처리했다면 `on conflict do nothing`으로 silent skip.
+- v2_admin_users INSERT idempotent.
+
+설명:
 - DO 블록 — 일회성 스크립트. `raise notice`는 SQL Editor에 출력.
 - `on conflict (id) do nothing` — idempotent. 다시 실행해도 안전.
 - 사용자가 아직 가입 안 했으면 skip + notice. 가입 후 본 SQL을 SQL Editor에 다시 붙여넣어 부여.
 
-### Step 9: 마이그레이션 적용 (사용자 web UI 또는 CLI)
+### Step 9: 마이그레이션 적용 (CLI 또는 SQL Editor)
 
-옵션 A — Supabase CLI (사용자가 CLI 설치되어 있으면):
+옵션 A — Supabase CLI (권장 — v1.0 link 이미 있다고 가정):
 
 ```bash
-npx supabase db push --include-all
+npx supabase db push
 ```
 
-옵션 B — SQL Editor 수동 (단순):
+CLI가 `supabase/migrations/` 폴더의 새 파일(20260525000000~20260525000006_v2_*.sql) 7개를 timestamp 순으로 자동 적용. v1.0 마이그레이션은 이미 적용됐으므로 skip됨.
 
-1. Supabase Dashboard → SQL Editor 열기
-2. 0001_create_users_events_participants.sql 내용 복붙 → Run
-3. 0002_create_admin_users.sql → Run
-4. 0003_create_rls_policies.sql → Run
-5. 0004_create_events_with_status_view.sql → Run
-6. 0005_create_storage_event_covers.sql → Run
-7. 0007_grant_first_admin.sql → Run (사용자가 아직 가입 안 했으면 notice 출력)
-8. 0006_seed_dev_data.sql은 시드 단계에서 적용 (사용자 5명 가입 후)
+옵션 B — SQL Editor 수동:
 
-Expected:
-- 0001~0005·0007 모두 SUCCESS
-- 0006는 사용자가 5번 가입 후 controller가 ID 채워 실행
+1. Supabase Dashboard → SQL Editor
+2. 7 파일 순서대로 (timestamp 순) Run:
+   - `20260525000000_v2_create_users_events_participants.sql`
+   - `20260525000001_v2_create_admin_users.sql`
+   - `20260525000002_v2_create_rls_policies.sql`
+   - `20260525000003_v2_create_events_with_status_view.sql`
+   - `20260525000004_v2_create_storage_event_covers.sql`
+   - `20260525000006_v2_grant_first_admin.sql` (가입 전이면 notice 후 skip)
+   - `20260525000005_v2_seed_dev_data.sql` (사용자 5명 가입 후)
+
+Expected: 모두 SUCCESS. RLS 정책 활성화 + 테이블 4개 + view 1개 + 함수 2개 + 트리거 1개 신설.
 
 ### Step 10: commit
 
 ```bash
-git add supabase/migrations-v2/
+git add supabase/migrations/
 git commit -m "$(cat <<'EOF'
-feat(v2): Phase 3 Task 007 DB 스키마 + RLS + Storage 마이그레이션
+feat(v2): Phase 3 Task 007 DB 스키마 + RLS + Storage 마이그레이션 (v2_ prefix)
 
-신규 (supabase/migrations-v2/):
-- 0001: users·events·event_participants 테이블 + 인덱스 + updated_at 트리거 +
-  handle_new_user 트리거 (auth.users → public.users upsert)
-- 0002: admin_users 테이블 + is_admin(uuid) RLS 헬퍼 함수 (3중 안전장치:
-  SECURITY DEFINER · SET LOCAL row_security OFF · stable)
-- 0003: RLS 정책 (users 본인+admin / events 인증 SELECT + owner·admin
-  UPDATE·DELETE / participants 4중 SELECT 조건)
-- 0004: events_with_status view (status 동적 계산 — 4시간 ongoing 윈도우)
-  + get_event_by_invite_code SECURITY DEFINER 함수 (anon invite 페이지)
-- 0005: event-covers Storage 버킷 + RLS (owner-only insert/update,
-  public read, file path: events/{event_id}/cover.{ext})
-- 0006: dev seed data 템플릿 (실행 시점에 사용자 가입 ID로 채움)
-- 0007: 첫 admin 부여 (controllercenter2025@gmail.com 하드코딩 + idempotent)
+REVISION: 기존 v1.0 Supabase project 재사용 + 모든 객체에 v2_ prefix.
 
-v1.0 supabase/migrations/ 폴더는 main에 보존. v2.0 별도 폴더 분리.
+신규 (supabase/migrations/ 통합 — v1.0과 같은 폴더, timestamp 분리):
+- 20260525000000_v2_create_users_events_participants.sql: v2_users +
+  v2_events + v2_event_participants 테이블 + 인덱스 + v2_handle_new_user
+  트리거 (auth.users → v2_users upsert, v1.0 profiles 트리거와 병행)
+- 20260525000001_v2_create_admin_users.sql: v2_admin_users + v2_is_admin
+  RLS 헬퍼 함수 (3중 안전장치)
+- 20260525000002_v2_create_rls_policies.sql: v2_users·v2_events·
+  v2_event_participants RLS 정책 (spec §5 매트릭스)
+- 20260525000003_v2_create_events_with_status_view.sql: v2_events_with_status
+  view + v2_get_event_by_invite_code SECURITY DEFINER (anon 지원)
+- 20260525000004_v2_create_storage_event_covers.sql: event-covers 버킷 +
+  v2_event_covers_* 정책 (v1.0 Storage 사용 0 — 버킷명 충돌 없음)
+- 20260525000005_v2_seed_dev_data.sql: dev seed 템플릿
+- 20260525000006_v2_grant_first_admin.sql: controllercenter2025@gmail.com
+  하드코딩 + idempotent + v2_users FK 충족 보장
 
 Plan: docs/superpowers/plans/2026-05-25-event-platform-v2-phase3.md
 Spec: docs/superpowers/specs/2026-05-24-event-platform-v2-design.md (§4·5)
@@ -732,48 +709,34 @@ EOF
 
 ---
 
-## Task 2: TypeScript types regenerate + `lib/queries/*` + `lib/auth/*` (예제 Task 007 후반)
+## Task 2: TypeScript types regenerate + `lib/queries/*` + `lib/auth/*` (예제 Task 007 후반) — REVISION 적용
 
-> Phase 2의 `lib/dummy/*.ts`를 `lib/queries/*.ts`로 1:1 교체. 함수 시그니처 보존 → 페이지/컴포넌트 코드 변경 0 목표.
+> Phase 2의 `lib/dummy/*.ts`를 `lib/queries/*.ts`로 1:1 교체. 함수 시그니처 보존 → 페이지/컴포넌트 코드 변경 0 목표. **REVISION: env 정정 step 제거. queries의 `.from("...")`은 모두 `v2_` prefix.**
 
 **Files:**
-- Modify: `lib/supabase/client.ts` · `server.ts` · `proxy.ts` (V2 env var 사용)
-- Modify: `lib/database.types.ts` (supabase gen types 자동 생성)
-- Create: `lib/queries/users.ts` · `events.ts` · `participants.ts`
-- Create: `lib/auth/current-user.ts` · `require-admin.ts`
+- ~~Modify: `lib/supabase/client.ts` · `server.ts` · `proxy.ts`~~ — SKIP (기존 env 그대로)
+- Modify: `lib/database.types.ts` (supabase gen types 자동 생성, v1.0 + v2_ 테이블 모두 포함)
+- Create: `lib/queries/users.ts` · `events.ts` · `participants.ts` (`v2_` 테이블 참조)
+- Create: `lib/auth/current-user.ts` · `require-admin.ts` (`v2_admin_users` 참조)
 - Delete: `lib/dummy/users.ts` · `events.ts` · `participants.ts`
 - Modify: 13개 페이지 + 컴포넌트 (dummy import → queries import)
 
-### Step 1: `lib/supabase/{client,server,proxy}.ts` — V2 env var 사용
+### Step 1: ~~`lib/supabase/{client,server,proxy}.ts` env 정정~~ — REVISION으로 SKIP
 
-3 파일 모두 다음 패턴으로 정정:
+기존 `NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 그대로 사용. 3 파일 변경 없음.
 
-```ts
-// before
-process.env.NEXT_PUBLIC_SUPABASE_URL!
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+### Step 2: TypeScript types 생성 (v1.0 + v2_ 통합 schema)
 
-// after
-process.env.NEXT_PUBLIC_SUPABASE_URL_V2!
-process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_V2!
-```
-
-> v1.0 변수는 보존(main branch에서 사용 중). v2.0 branch만 V2 변수 사용.
-
-3 파일 모두 동일 grep-replace 패턴.
-
-### Step 2: TypeScript types 생성
-
-옵션 A — Supabase CLI:
+옵션 A — Supabase CLI (v1.0 project link 이미 있다고 가정):
 ```bash
-npx supabase gen types typescript --project-id <v2-project-ref> --schema public > lib/database.types.ts
+npx supabase gen types typescript --linked --schema public > lib/database.types.ts
 ```
 
 옵션 B — Supabase Dashboard:
 1. Dashboard → API Docs → "Generate TypeScript types"
 2. 출력을 `lib/database.types.ts`에 복붙
 
-Expected: `Database` 제네릭 인터페이스 포함된 파일. tables(users·events·event_participants·admin_users) + views(events_with_status) + functions(is_admin·get_event_by_invite_code) 모두 매핑.
+Expected: `Database` 제네릭에 v1.0 테이블(profiles·groups·events·event_participations 등) **+** v2_ 테이블(v2_users·v2_events·v2_event_participants·v2_admin_users) + view(v2_events_with_status) + 함수(v2_is_admin·v2_get_event_by_invite_code) 모두 포함.
 
 ### Step 3: `lib/queries/users.ts`
 
@@ -784,33 +747,22 @@ import { createClient } from "@/lib/supabase/server";
 import type { User } from "@/types/user";
 import type { Database } from "@/lib/database.types";
 
-// DB row → 외부 User 타입 변환
-function mapUserRow(row: Database["public"]["Tables"]["users"]["Row"], isAdmin: boolean): User {
+function mapUserRow(row: Database["public"]["Tables"]["v2_users"]["Row"], isAdmin: boolean): User {
   return {
     id: row.id,
     email: row.email,
     fullName: row.full_name,
     avatarUrl: row.avatar_url,
-    role: isAdmin ? "admin" : "participant", // Phase 2 외부 인터페이스 호환. host는 동적(이벤트 주최 여부)이라 페이지에서 판단.
+    role: isAdmin ? "admin" : "participant",
     createdAt: row.created_at,
   };
 }
 
 export async function getUserById(id: string): Promise<User | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await supabase.from("v2_users").select("*").eq("id", id).maybeSingle();
   if (error || !data) return null;
-
-  // admin 여부 별도 조회 (Phase 2의 role 컬럼 호환)
-  const { count } = await supabase
-    .from("admin_users")
-    .select("*", { count: "exact", head: true })
-    .eq("id", id);
-
+  const { count } = await supabase.from("v2_admin_users").select("*", { count: "exact", head: true }).eq("id", id);
   return mapUserRow(data, (count ?? 0) > 0);
 }
 
@@ -818,25 +770,21 @@ export async function getUsersByRole(role: User["role"]): Promise<User[]> {
   const supabase = await createClient();
   if (role === "admin") {
     const { data } = await supabase
-      .from("admin_users")
-      .select("id, users:users!inner(*)")
+      .from("v2_admin_users")
+      .select("id, v2_users:v2_users!inner(*)")
       .order("granted_at", { ascending: false });
-    return (data ?? []).map((r) => mapUserRow(r.users as Database["public"]["Tables"]["users"]["Row"], true));
+    return (data ?? []).map((r) => mapUserRow(r.v2_users as Database["public"]["Tables"]["v2_users"]["Row"], true));
   }
-  // participant/host는 동적 판단 — 본 함수는 admin만 의미 있음. participant/host는 전체 사용자 + 별도 필터링.
-  const { data } = await supabase.from("users").select("*").order("created_at", { ascending: false });
+  const { data } = await supabase.from("v2_users").select("*").order("created_at", { ascending: false });
   return (data ?? []).map((r) => mapUserRow(r, false));
 }
 
-// admin 페이지에서 전체 사용자 목록 (admin 여부 포함)
 export async function listAllUsersForAdmin(): Promise<User[]> {
   const supabase = await createClient();
-  const { data: users } = await supabase.from("users").select("*").order("created_at", { ascending: false });
+  const { data: users } = await supabase.from("v2_users").select("*").order("created_at", { ascending: false });
   if (!users) return [];
-
-  const { data: admins } = await supabase.from("admin_users").select("id");
+  const { data: admins } = await supabase.from("v2_admin_users").select("id");
   const adminSet = new Set((admins ?? []).map((a) => a.id));
-
   return users.map((u) => mapUserRow(u, adminSet.has(u.id)));
 }
 ```
@@ -855,7 +803,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Event } from "@/types/event";
 import type { Database } from "@/lib/database.types";
 
-type EventWithStatusRow = Database["public"]["Views"]["events_with_status"]["Row"];
+type EventWithStatusRow = Database["public"]["Views"]["v2_events_with_status"]["Row"];
 
 function mapEventRow(row: EventWithStatusRow): Event {
   return {
@@ -875,14 +823,13 @@ function mapEventRow(row: EventWithStatusRow): Event {
 
 export async function getEventById(id: string): Promise<Event | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("events_with_status").select("*").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("v2_events_with_status").select("*").eq("id", id).maybeSingle();
   return data ? mapEventRow(data) : null;
 }
 
 export async function getEventByInviteCode(code: string): Promise<Event | null> {
   const supabase = await createClient();
-  // SECURITY DEFINER 함수 호출 (anon도 가능)
-  const { data } = await supabase.rpc("get_event_by_invite_code", { p_code: code });
+  const { data } = await supabase.rpc("v2_get_event_by_invite_code", { p_code: code });
   if (!data) return null;
   return mapEventRow(data as EventWithStatusRow);
 }
@@ -890,7 +837,7 @@ export async function getEventByInviteCode(code: string): Promise<Event | null> 
 export async function getEventsByCreator(userId: string): Promise<Event[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("events_with_status")
+    .from("v2_events_with_status")
     .select("*")
     .eq("created_by", userId)
     .order("event_date", { ascending: false });
@@ -900,7 +847,7 @@ export async function getEventsByCreator(userId: string): Promise<Event[]> {
 export async function getRecentEvents(limit = 5): Promise<Event[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("events_with_status")
+    .from("v2_events_with_status")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -910,7 +857,7 @@ export async function getRecentEvents(limit = 5): Promise<Event[]> {
 export async function getUpcomingEvents(limit = 5): Promise<Event[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("events_with_status")
+    .from("v2_events_with_status")
     .select("*")
     .eq("status", "upcoming")
     .order("event_date", { ascending: true })
@@ -918,11 +865,10 @@ export async function getUpcomingEvents(limit = 5): Promise<Event[]> {
   return (data ?? []).map(mapEventRow);
 }
 
-// admin 페이지용 전체 목록 (status 포함, 검색·필터는 client memo)
 export async function listAllEventsForAdmin(): Promise<Event[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("events_with_status")
+    .from("v2_events_with_status")
     .select("*")
     .order("created_at", { ascending: false });
   return (data ?? []).map(mapEventRow);
@@ -944,7 +890,7 @@ import type { EventParticipant } from "@/types/event-participant";
 import type { Event } from "@/types/event";
 import type { Database } from "@/lib/database.types";
 
-function mapParticipantRow(row: Database["public"]["Tables"]["event_participants"]["Row"]): EventParticipant {
+function mapParticipantRow(row: Database["public"]["Tables"]["v2_event_participants"]["Row"]): EventParticipant {
   return {
     eventId: row.event_id,
     userId: row.user_id,
@@ -952,7 +898,7 @@ function mapParticipantRow(row: Database["public"]["Tables"]["event_participants
   };
 }
 
-function mapEventRow(row: Database["public"]["Views"]["events_with_status"]["Row"]): Event {
+function mapEventRow(row: Database["public"]["Views"]["v2_events_with_status"]["Row"]): Event {
   return {
     id: row.id!,
     title: row.title!,
@@ -971,7 +917,7 @@ function mapEventRow(row: Database["public"]["Views"]["events_with_status"]["Row
 export async function getParticipantsOfEvent(eventId: string): Promise<EventParticipant[]> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("event_participants")
+    .from("v2_event_participants")
     .select("*")
     .eq("event_id", eventId)
     .order("joined_at", { ascending: true });
@@ -980,21 +926,20 @@ export async function getParticipantsOfEvent(eventId: string): Promise<EventPart
 
 export async function getEventsOfParticipant(userId: string): Promise<Event[]> {
   const supabase = await createClient();
-  // event_participants JOIN events_with_status
   const { data } = await supabase
-    .from("event_participants")
-    .select("event_id, events_with_status:events_with_status!inner(*)")
+    .from("v2_event_participants")
+    .select("event_id, v2_events_with_status:v2_events_with_status!inner(*)")
     .eq("user_id", userId)
     .order("joined_at", { ascending: false });
   return (data ?? []).map((r) =>
-    mapEventRow(r.events_with_status as Database["public"]["Views"]["events_with_status"]["Row"])
+    mapEventRow(r.v2_events_with_status as Database["public"]["Views"]["v2_events_with_status"]["Row"])
   );
 }
 
 export async function countParticipantsOfEvent(eventId: string): Promise<number> {
   const supabase = await createClient();
   const { count } = await supabase
-    .from("event_participants")
+    .from("v2_event_participants")
     .select("*", { count: "exact", head: true })
     .eq("event_id", eventId);
   return count ?? 0;
@@ -1040,7 +985,7 @@ export async function requireAdmin(): Promise<{ userId: string }> {
   if (!user) redirect("/admin/login");
 
   const { count } = await supabase
-    .from("admin_users")
+    .from("v2_admin_users")
     .select("*", { count: "exact", head: true })
     .eq("id", user.id);
 
@@ -1218,10 +1163,10 @@ feat(v2): Phase 3 Task 007 후반 — lib/queries + lib/auth + dummy 폐기
   Phase 2 client page 로직을 client child로 분리 (page는 server)
 
 수정:
-- lib/database.types.ts: supabase gen types 자동 생성 (v2.0 project schema)
-- lib/supabase/{client,server,proxy}.ts: NEXT_PUBLIC_SUPABASE_URL → _V2
+- lib/database.types.ts: supabase gen types 자동 생성 (v1.0 + v2_ 통합 schema)
 - 12개 페이지: dummy import → queries import + await 추가, server component
   환원 (admin/events·users)
+- (REVISION) lib/supabase/* env 정정 SKIP — 기존 v1.0 변수 그대로
 
 폐기:
 - lib/dummy/{users,events,participants}.ts
@@ -1645,7 +1590,7 @@ export async function createEvent(formData: FormData): Promise<void> {
     inviteCode = generateInviteCode();
     const eventDateIso = kstDateTimeLocalToIso(parsed.eventDate);
     const { data, error } = await supabase
-      .from("events")
+      .from("v2_events")
       .insert({
         title: parsed.title,
         description: parsed.description || null,
@@ -1661,16 +1606,14 @@ export async function createEvent(formData: FormData): Promise<void> {
       break;
     }
     if (error?.code !== "23505") {
-      // UNIQUE 위반(23505) 외의 에러는 즉시 throw
       throw error;
     }
   }
   if (!inserted) throw new Error("invite_code 생성 3회 실패");
 
-  // 커버 이미지 업로드 (선택)
   if (cover && cover.size > 0) {
     const url = await uploadEventCover(inserted.id, cover);
-    await supabase.from("events").update({ cover_image_url: url }).eq("id", inserted.id);
+    await supabase.from("v2_events").update({ cover_image_url: url }).eq("id", inserted.id);
   }
 
   revalidatePath("/");
@@ -1693,7 +1636,7 @@ export async function updateEvent(eventId: string, formData: FormData): Promise<
   const eventDateIso = kstDateTimeLocalToIso(parsed.eventDate);
 
   const { error } = await supabase
-    .from("events")
+    .from("v2_events")
     .update({
       title: parsed.title,
       description: parsed.description || null,
@@ -1705,7 +1648,7 @@ export async function updateEvent(eventId: string, formData: FormData): Promise<
 
   if (cover && cover.size > 0) {
     const url = await uploadEventCover(eventId, cover);
-    await supabase.from("events").update({ cover_image_url: url }).eq("id", eventId);
+    await supabase.from("v2_events").update({ cover_image_url: url }).eq("id", eventId);
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -1715,9 +1658,8 @@ export async function updateEvent(eventId: string, formData: FormData): Promise<
 
 export async function deleteEvent(eventId: string): Promise<void> {
   const supabase = await createClient();
-  // 커버 이미지 정리 (실패해도 row 삭제는 진행)
   await deleteEventCover(eventId).catch(() => {});
-  const { error } = await supabase.from("events").delete().eq("id", eventId);
+  const { error } = await supabase.from("v2_events").delete().eq("id", eventId);
   if (error) throw error;
 
   revalidatePath("/my-events");
@@ -1909,7 +1851,7 @@ export async function joinEvent(eventId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/auth/login?redirect=${encodeURIComponent(`/events/${eventId}`)}`);
 
-  const { error } = await supabase.from("event_participants").insert({
+  const { error } = await supabase.from("v2_event_participants").insert({
     event_id: eventId,
     user_id: user.id,
   });
@@ -1926,7 +1868,7 @@ export async function leaveEvent(eventId: string): Promise<void> {
   if (!user) redirect("/auth/login");
 
   const { error } = await supabase
-    .from("event_participants")
+    .from("v2_event_participants")
     .delete()
     .eq("event_id", eventId)
     .eq("user_id", user.id);
@@ -1953,8 +1895,8 @@ export function EventParticipantsCount({ eventId, initialCount }: { eventId: str
     const supabase = createClient();
     const channel = supabase
       .channel(`event:${eventId}:participants`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "event_participants", filter: `event_id=eq.${eventId}` }, () => setCount((c) => c + 1))
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "event_participants", filter: `event_id=eq.${eventId}` }, () => setCount((c) => Math.max(0, c - 1)))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "v2_event_participants", filter: `event_id=eq.${eventId}` }, () => setCount((c) => c + 1))
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "v2_event_participants", filter: `event_id=eq.${eventId}` }, () => setCount((c) => Math.max(0, c - 1)))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [eventId]);
@@ -2061,7 +2003,7 @@ export async function adminDeleteEvent({ eventId, reason }: { eventId: string; r
   const supabase = await createClient();
   console.log(`[admin] delete event ${eventId}, reason: ${reason || "(none)"}`);
   await deleteEventCover(eventId).catch(() => {});
-  const { error } = await supabase.from("events").delete().eq("id", eventId);
+  const { error } = await supabase.from("v2_events").delete().eq("id", eventId);
   if (error) throw error;
   revalidatePath("/admin/events");
   revalidatePath("/admin");
@@ -2081,7 +2023,7 @@ export async function adminDeleteUser({ userId, reason }: { userId: string; reas
   await requireAdmin();
   const supabase = await createClient();
   console.log(`[admin] delete user ${userId}, reason: ${reason || "(none)"}`);
-  const { error } = await supabase.from("users").delete().eq("id", userId);
+  const { error } = await supabase.from("v2_users").delete().eq("id", userId);
   if (error) throw error;
   revalidatePath("/admin/users");
 }
@@ -2127,10 +2069,10 @@ import { getRecentEvents } from "@/lib/queries/events";
 async function getDashboardMetrics() {
   const supabase = await createClient();
   const [total, upcoming, completed, users] = await Promise.all([
-    supabase.from("events").select("*", { count: "exact", head: true }),
-    supabase.from("events_with_status").select("*", { count: "exact", head: true }).eq("status", "upcoming"),
-    supabase.from("events_with_status").select("*", { count: "exact", head: true }).eq("status", "completed"),
-    supabase.from("users").select("*", { count: "exact", head: true }),
+    supabase.from("v2_events").select("*", { count: "exact", head: true }),
+    supabase.from("v2_events_with_status").select("*", { count: "exact", head: true }).eq("status", "upcoming"),
+    supabase.from("v2_events_with_status").select("*", { count: "exact", head: true }).eq("status", "completed"),
+    supabase.from("v2_users").select("*", { count: "exact", head: true }),
   ]);
   return {
     total: total.count ?? 0,
@@ -2178,7 +2120,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 async function buildTrend(): Promise<TrendPoint[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("events").select("created_at");
+  const { data } = await supabase.from("v2_events").select("created_at");
   const counts = new Map<string, number>();
   for (const e of data ?? []) {
     const ym = e.created_at.slice(0, 7);
@@ -2189,7 +2131,7 @@ async function buildTrend(): Promise<TrendPoint[]> {
 
 async function buildStatusSlices(): Promise<StatusSlice[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("events_with_status").select("status");
+  const { data } = await supabase.from("v2_events_with_status").select("status");
   const counts = { upcoming: 0, ongoing: 0, completed: 0 };
   for (const e of data ?? []) counts[e.status as keyof typeof counts]++;
   return [
@@ -2530,12 +2472,12 @@ git push origin feat/event-platform-v2
 다음으로 교체:
 ```
 - **Phase 3: 데이터베이스 + 핵심 기능** ✅ 완료 (2026-MM-DD)
-  - 별도 Supabase project + supabase/migrations-v2/ 7개 마이그레이션
-  - 핵심 테이블 3개 (users·events·event_participants) + admin_users + is_admin RLS 헬퍼
-  - events_with_status view (status 동적 계산, cron 의존 없음)
-  - get_event_by_invite_code SECURITY DEFINER (anon invite 페이지)
+  - 기존 v1.0 Supabase project 재사용 + supabase/migrations/ 통합 (v2_ prefix 7개)
+  - 핵심 테이블 4개 (v2_users·v2_events·v2_event_participants·v2_admin_users) + v2_is_admin RLS 헬퍼
+  - v2_events_with_status view (status 동적 계산, cron 의존 없음)
+  - v2_get_event_by_invite_code SECURITY DEFINER (anon invite 페이지)
   - event-covers Storage 버킷 + owner-only RLS
-  - Google OAuth + handle_new_user 트리거 (public.users upsert)
+  - Google OAuth (v1.0 재사용) + v2_handle_new_user 트리거 (auth.users → v2_users upsert, v1.0 profiles 트리거와 병행)
   - admin 3중 가드 (proxy whitelist + (authed) layout requireAdmin + Server Action 재검증)
   - Server Action: createEvent·updateEvent·deleteEvent·joinEvent·leaveEvent·
     adminDeleteEvent·adminDeleteUser·updateProfile (모두 "use server")
@@ -2571,8 +2513,8 @@ Plan 8 task 모두 PASS:
 - build 25 routes (Cache Components + Server Action)
 - Playwright MCP 19/19 PASS (또는 실행 결과 표)
 
-dummy → 실데이터 swap 완료. v2.0은 별도 Supabase project로 production-grade
-RLS + Storage + Realtime + admin 3중 가드 적용.
+dummy → 실데이터 swap 완료. v2.0은 v1.0과 같은 Supabase project 안에서 v2_ prefix로
+격리 + production-grade RLS + Storage + Realtime + admin 3중 가드 적용.
 
 다음 단계: Phase 3.5 Vercel 배포 (별도 plan).
 
