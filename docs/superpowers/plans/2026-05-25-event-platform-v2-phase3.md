@@ -39,7 +39,7 @@
 | --- | --- | --- | --- |
 | 1 | admin role 부여 방식 | **B — 별도 `admin_users` 테이블** | 학습 단계 SQL/RLS 명시성 우선. 감사 가능(`granted_by`, `granted_at`). A(app_metadata)는 service_role API 또는 Dashboard 수동 부여라 학습 UX 복잡. self-promote 보안 약점 없음(서비스 키 또는 SQL Editor로만 INSERT 가능). |
 | 2 | `events.status` 자동 관리 | **PostgreSQL view (`events_with_status`)** | cron 없이 항상 정확. `event_date` 비교 동적 계산. status 컬럼 제거 후 view에서 계산 → 라이브 변경 즉시 반영. |
-| 3 | 첫 admin 부여 흐름 | **하드코딩 마이그레이션** (`controllercenter2025@gmail.com`) | deterministic + repeatable. dev/staging 일관. SECURITY DEFINER 함수가 auth.users에서 email로 id 조회 후 admin_users INSERT. production 진입 시 환경변수 분기 가능. |
+| 3 | 첫 admin 부여 흐름 | **하드코딩 마이그레이션** (`inmingoon@gmail.com`) | deterministic + repeatable. dev/staging 일관. SECURITY DEFINER 함수가 auth.users에서 email로 id 조회 후 admin_users INSERT. production 진입 시 환경변수 분기 가능. |
 | 4 | 더미 시드 데이터 | **별도 dev-only 마이그레이션** (`0006_seed_dev_data.sql`) | Phase 2 lib/dummy 데이터(e-001~e-010, u-001~u-005)와 일관성 유지. admin 차트 다양성 확보. production 마이그레이션은 시드 미포함(파일명 prefix로 분기). |
 | 5 | v2.0 마이그레이션 폴더 | **`supabase/migrations/` 통합** (REVISION) | v1.0과 같은 project 재사용 → 폴더 분리 무의미. CLI 자동 인식. 파일명 `<timestamp>_v2_*.sql`로 의미 분리. |
 | 6 | dummy → server fetch 교체 패턴 | **헬퍼 시그니처 보존, body만 server fetch로 교체** | page·component 변경 0 목표. 함수명·반환 타입 유지(`Event[]`·`User \| null` 등). `async` 추가만. lib/dummy/ 폐기 후 lib/queries/ 신설. |
@@ -74,7 +74,7 @@ supabase/migrations/          (v1.0 폴더와 통합, v1.0 7개는 보존)
 ├── 20260525000003_v2_create_events_with_status_view.sql
 ├── 20260525000004_v2_create_storage_event_covers.sql
 ├── 20260525000005_v2_seed_dev_data.sql              (dev only)
-└── 20260525000006_v2_grant_first_admin.sql          (controllercenter2025@gmail.com)
+└── 20260525000006_v2_grant_first_admin.sql          (inmingoon@gmail.com)
 ```
 
 ### 신규 — 데이터 액세스 + 인증 + Server Action (Task 2·3·4·5·6)
@@ -607,7 +607,7 @@ Create:
 - 학습 흐름: 사용자가 dev에서 5번 Google OAuth 로그인 → 5 user_id 확보 → controller에게 전달 → controller가 0006_seed_dev_data.sql을 사용자 ID로 채워 INSERT.
 - 대체 옵션: production 가입 흐름을 dev에서 그대로 수행 후 admin 화면에서 직접 INSERT. 학습 가치 더 높음 — 본 plan은 두 옵션 모두 명시.
 
-### Step 8: `20260525000006_v2_grant_first_admin.sql` — 첫 admin 부여 (controllercenter2025@gmail.com)
+### Step 8: `20260525000006_v2_grant_first_admin.sql` — 첫 admin 부여 (inmingoon@gmail.com)
 
 Create:
 
@@ -618,7 +618,7 @@ Create:
 
 do $$
 declare
-  target_email text := 'controllercenter2025@gmail.com';
+  target_email text := 'inmingoon@gmail.com';
   target_uid uuid;
 begin
   select id into target_uid from auth.users where email = target_email limit 1;
@@ -696,7 +696,7 @@ REVISION: 기존 v1.0 Supabase project 재사용 + 모든 객체에 v2_ prefix.
 - 20260525000004_v2_create_storage_event_covers.sql: event-covers 버킷 +
   v2_event_covers_* 정책 (v1.0 Storage 사용 0 — 버킷명 충돌 없음)
 - 20260525000005_v2_seed_dev_data.sql: dev seed 템플릿
-- 20260525000006_v2_grant_first_admin.sql: controllercenter2025@gmail.com
+- 20260525000006_v2_grant_first_admin.sql: inmingoon@gmail.com
   하드코딩 + idempotent + v2_users FK 충족 보장
 
 Plan: docs/superpowers/plans/2026-05-25-event-platform-v2-phase3.md
@@ -2193,7 +2193,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - dev server 가동 (`npm run dev`, port 3000)
 - 사용자 5명 Google OAuth 가입 완료 (Task 1 Step 7 seed 후 또는 dev에서 직접 가입)
-- 첫 admin 부여 완료 (Task 1 0007 마이그레이션 — controllercenter2025@gmail.com)
+- 첫 admin 부여 완료 (Task 1 0007 마이그레이션 — inmingoon@gmail.com)
 - 0006 seed event 데이터 적용 완료 (또는 host1 계정으로 수동 이벤트 3개 생성)
 
 ### Step 2: 주최자 플로우 시나리오 — `docs/v2-phase3/playwright-mcp-host-flow.md`
@@ -2300,7 +2300,7 @@ Create:
 
 1. `mcp__playwright__browser_navigate http://localhost:3000/admin`
 2. Expected: `/admin/login` redirect
-3. "Google로 관리자 로그인" 클릭 → admin@example.com (또는 controllercenter2025@gmail.com)
+3. "Google로 관리자 로그인" 클릭 → admin@example.com (또는 inmingoon@gmail.com)
 4. callback 후 `/admin` 도착
 5. Expected: StatCard 4개 (전체 이벤트 / 예정 / 종료 / 가입자) 모두 실데이터 + 최근 이벤트 5건
 
