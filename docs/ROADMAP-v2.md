@@ -19,11 +19,16 @@
   - Plan: `docs/superpowers/plans/2026-05-24-event-platform-v2-phase1.md`
   - 회귀: build 24 routes, 0 warnings, lint 0, Playwright sanity 부분 PASS (홈·invite/[code] 컨텐츠 검증 + 보호 라우트 4개 proxy redirect 의도된 동작 — Phase 3 Task 008에서 admin/login whitelist + admin 권한 분기 예정)
   - Plan 일탈: Cache Components 제약으로 dynamic route 3개에 force-dynamic 시도 → Suspense wrap 패턴(v1.0 app/page.tsx와 동일)으로 정공법 적용
-- **Phase 2: UI/UX 완성 (더미 데이터)** (Task 003~006)
-  - 공통 컴포넌트 라이브러리
-  - 주최자 모바일 UI (이벤트 생성/관리/공유)
-  - 참여자 모바일 UI (초대 가입/이벤트 확인)
-  - 관리자 데스크톱 UI (대시보드/이벤트 관리/사용자 관리/통계)
+- **Phase 2: UI/UX 완성 (더미 데이터)** ✅ 완료 (2026-05-25)
+  - shadcn 9개 추가 (avatar·dialog·form·select·table·skeleton·separator·tabs·popover) — calendar는 datetime-local 채택으로 YAGNI 제거
+  - lib/dummy/{users,events,participants}.ts + 헬퍼 함수 (Phase 3 supabase fetch로 시그니처 그대로 교체 가능)
+  - 주최자: 홈 hero + 다가오는 이벤트 EventCard 그리드, EventForm (RHF + Zod schema factory — mode별 enforceFutureDate 분기), 프로필 + ThemeToggle
+  - 참여자: InvitePreview, EventDetailHeader + isHost 분기 Tabs (참여자/관리), my-events 주최한/참여한 Tabs, EventShareActions (클립보드 + 카카오톡 placeholder)
+  - 관리자: StatCard 4개 + AdminDataTable (generic + 검색 200ms debounce + client 페이지네이션 + 삭제 Dialog 사유 입력) + Recharts (LineChart 월별·PieChart 상태) + AdminSidebar 하단 ThemeToggle
+  - Plan: `docs/superpowers/plans/2026-05-24-event-platform-v2-phase2.md`
+  - 회귀: build 25 routes 0 warning, lint 0, typecheck 0
+  - 적응 사항: ① LucideIcon function prop → ReactNode (RSC 직렬화 회피) ② Suspense per nav link (Cache Components + usePathname) ③ zod v3→v4·resolvers v3→v5 (shadcn form peer dep) ④ Recharts stroke 리터럴 hex (SVG var() 미평가)
+  - reviewer fix 8건 (Task 1: 6 spec 일치 / Task 2: 3 Important / Task 3: 1 Important hydration / Task 4: 1 Critical + 3 Important)
 - **Phase 3: 데이터베이스 + 핵심 기능** (Task 007~012, Playwright MCP E2E 필수)
   - 스키마 + RLS + Supabase Storage (event-covers 버킷)
   - Google OAuth + admin 권한 미들웨어
