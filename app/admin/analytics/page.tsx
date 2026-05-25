@@ -1,10 +1,61 @@
+import { EventTrendChart, type TrendPoint } from "@/components/charts/event-trend-chart";
+import { StatusPieChart, type StatusSlice } from "@/components/charts/status-pie-chart";
+import { DUMMY_EVENTS } from "@/lib/dummy/events";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+function buildTrend(): TrendPoint[] {
+  const counts = new Map<string, number>();
+  for (const e of DUMMY_EVENTS) {
+    const ym = e.createdAt.slice(0, 7); // "2026-05"
+    counts.set(ym, (counts.get(ym) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, count]) => ({ month, count }));
+}
+
+function buildStatusSlices(): StatusSlice[] {
+  const counts = { upcoming: 0, ongoing: 0, completed: 0 };
+  for (const e of DUMMY_EVENTS) counts[e.status]++;
+  return [
+    { status: "upcoming", count: counts.upcoming },
+    { status: "ongoing", count: counts.ongoing },
+    { status: "completed", count: counts.completed },
+  ];
+}
+
 export default function AdminAnalyticsPage() {
+  const trend = buildTrend();
+  const slices = buildStatusSlices();
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold">통계 분석</h1>
-      <p className="mt-2 text-muted-foreground">
-        (Phase 2 Task 006에서 Recharts 라이브러리 설치 + 더미 차트 구현)
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">통계 분석</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          이벤트 추세와 상태 분포를 확인하세요.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>월별 이벤트 생성 수</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EventTrendChart data={trend} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>이벤트 상태 분포</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusPieChart data={slices} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
