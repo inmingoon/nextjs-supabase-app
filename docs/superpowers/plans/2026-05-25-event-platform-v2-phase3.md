@@ -462,7 +462,8 @@ Create:
 -- v2.0 Phase 3 Task 007 — v2_events_with_status view (spec §5 결정 2)
 -- =============================================================================
 
-create or replace view public.v2_events_with_status as
+create or replace view public.v2_events_with_status
+with (security_invoker = true) as
 select
   e.*,
   case
