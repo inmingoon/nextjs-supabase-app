@@ -43,6 +43,7 @@ export function EventForm({ mode, defaultValues, eventId }: Props) {
   });
 
   function onSubmit(values: EventFormValues) {
+    // TODO(Phase 3): Server Action 전 values.eventDate 를 kstDateTimeLocalToIso() 로 변환해야 timestamptz 가 KST 시각으로 정확히 저장됨. 미변환 시 9시간 shift.
     console.log(`[Phase 2 dummy] EventForm submit (${mode})`, {
       eventId,
       values,
