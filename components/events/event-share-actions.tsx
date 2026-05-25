@@ -8,12 +8,8 @@ import { Copy, Check, Share2 } from "lucide-react";
 export function EventShareActions({ inviteCode }: { inviteCode: string }) {
   const [copied, setCopied] = useState(false);
 
-  const inviteUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/invite/${inviteCode}`
-      : `/invite/${inviteCode}`;
-
   async function copy() {
+    const inviteUrl = `${window.location.origin}/invite/${inviteCode}`;
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
