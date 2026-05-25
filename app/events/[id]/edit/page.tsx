@@ -1,5 +1,8 @@
 import { Suspense } from "react";
+import { notFound } from "next/navigation";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { EventForm } from "@/components/events/event-form";
+import { getEventById } from "@/lib/dummy/events";
 
 async function EditEventContent({
   params,
@@ -7,13 +10,28 @@ async function EditEventContent({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const event = getEventById(id);
+  if (!event) notFound();
+
+  const defaultValues = {
+    title: event.title,
+    description: event.description ?? "",
+    // datetime-local 호환: YYYY-MM-DDTHH:mm (ISO 문자열 앞 16자)
+    eventDate: event.eventDate.slice(0, 16),
+    location: event.location,
+  };
+
   return (
     <main className="flex-1 px-4 py-6 pb-20">
       <h1 className="text-2xl font-bold">이벤트 수정</h1>
-      <p className="mt-2 text-muted-foreground">ID: {id}</p>
-      <p className="mt-2 text-muted-foreground">
-        (Phase 2 Task 004에서 주최자만 접근, 폼 구현)
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{event.title}</p>
+      <div className="mt-6">
+        <EventForm
+          mode="edit"
+          eventId={event.id}
+          defaultValues={defaultValues}
+        />
+      </div>
     </main>
   );
 }
