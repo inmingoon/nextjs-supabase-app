@@ -2,6 +2,24 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 
+/** 비로그인 사용자도 접근 가능한 경로 — admin 경로는 별도 분기. */
+const WHITELIST = [
+  "/",
+  "/auth/login",
+  "/auth/callback",
+  "/auth/confirm",
+  "/auth/error",
+  "/auth/forgot-password",
+  "/auth/sign-up",
+  "/auth/sign-up-success",
+  "/auth/update-password",
+  "/admin/login",
+];
+
+/**
+ * Next.js middleware proxy — Supabase session refresh + 비로그인 redirect.
+ * admin role 검증은 `app/admin/(authed)/layout.tsx`의 server guard에서 수행.
+ */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -47,17 +65,17 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth") &&
-    !request.nextUrl.pathname.startsWith("/invite/")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+  // 인증 가드: 비로그인 사용자 redirect (whitelist 외).
+  // - `/invite/[code]`는 비로그인 OK (Phase 1 spec §6).
+  // - admin 경로는 `/admin/login`으로, 나머지는 `/auth/login`으로 redirect.
+  const path = request.nextUrl.pathname;
+  const isWhitelisted = WHITELIST.includes(path) || path.startsWith("/invite/");
+
+  if (!user && !isWhitelisted) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = path.startsWith("/admin") ? "/admin/login" : "/auth/login";
+    loginUrl.searchParams.set("redirect", path);
+    return NextResponse.redirect(loginUrl);
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

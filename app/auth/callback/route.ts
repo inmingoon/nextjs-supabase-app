@@ -6,7 +6,7 @@ import { type NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/protected";
+  const next = searchParams.get("next") ?? "/";
   // 사용자가 Google 동의를 거부했거나 provider 오류가 난 경우
   const oauthError =
     searchParams.get("error_description") ?? searchParams.get("error");

@@ -9,10 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getEventById } from "@/lib/queries/events";
-import {
-  getParticipantsOfEvent,
-  countParticipantsOfEvent,
-} from "@/lib/queries/participants";
+import { countParticipantsOfEvent } from "@/lib/queries/participants";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { Pencil } from "lucide-react";
 
@@ -25,8 +22,7 @@ async function EventDetailContent({
   const event = await getEventById(id);
   if (!event) notFound();
 
-  const [participants, count, currentUser] = await Promise.all([
-    getParticipantsOfEvent(event.id),
+  const [count, currentUser] = await Promise.all([
     countParticipantsOfEvent(event.id),
     getCurrentUser(),
   ]);
@@ -45,7 +41,7 @@ async function EventDetailContent({
             <TabsTrigger value="manage">관리</TabsTrigger>
           </TabsList>
           <TabsContent value="participants" className="space-y-3">
-            <EventParticipantsList participants={participants} />
+            <EventParticipantsList eventId={event.id} />
           </TabsContent>
           <TabsContent value="manage" className="space-y-4">
             <div>
@@ -63,7 +59,7 @@ async function EventDetailContent({
       ) : (
         <section className="space-y-3">
           <h2 className="text-base font-semibold">참여자 ({count})</h2>
-          <EventParticipantsList participants={participants} />
+          <EventParticipantsList eventId={event.id} />
         </section>
       )}
     </main>

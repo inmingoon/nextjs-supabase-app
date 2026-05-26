@@ -393,6 +393,10 @@ export type Database = {
           updated_at: string | null
         }
       }
+      v2_get_event_public_users: {
+        Args: { p_event_id: string }
+        Returns: { id: string; full_name: string; avatar_url: string }[]
+      }
       v2_is_admin: {
         Args: { target_user_id: string }
         Returns: boolean

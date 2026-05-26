@@ -83,3 +83,22 @@ export async function countParticipantsOfEvent(eventId: string): Promise<number>
     .eq("event_id", eventId);
   return count ?? 0;
 }
+
+/**
+ * 이벤트 참여자의 공개 프로필(id/name/avatar) 조회 — RLS 우회용 SECURITY DEFINER 함수 호출.
+ * 호출자는 해당 이벤트의 host 또는 참여자여야 함; 그 외는 빈 배열.
+ * Task 2 review Important #1 (RLS 차단) + #3 (N+1) 동시 해소.
+ */
+export async function getEventPublicUsers(
+  eventId: string,
+): Promise<Array<{ id: string; fullName: string; avatarUrl: string | null }>> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("v2_get_event_public_users", {
+    p_event_id: eventId,
+  });
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    fullName: row.full_name,
+    avatarUrl: row.avatar_url,
+  }));
+}
