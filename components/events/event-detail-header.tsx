@@ -1,6 +1,7 @@
 import { EventStatusBadge } from "./event-status-badge";
+import { EventParticipantsCount } from "./event-participants-count";
 import { formatKstDateLong } from "@/lib/datetime";
-import { MapPin, Calendar as CalendarIcon, Users } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon } from "lucide-react";
 import type { Event } from "@/types/event";
 
 type Props = {
@@ -39,10 +40,10 @@ export function EventDetailHeader({ event, participantCount }: Props) {
             <MapPin className="h-4 w-4" />
             {event.location}
           </p>
-          <p className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            참여자 {participantCount}명
-          </p>
+          <EventParticipantsCount
+            eventId={event.id}
+            initialCount={participantCount}
+          />
         </div>
 
         {event.description ? (
