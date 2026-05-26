@@ -32,7 +32,10 @@ export async function getUserById(id: string): Promise<User | null> {
   return mapUserRow(data, (count ?? 0) > 0);
 }
 
-/** role로 사용자 필터. admin은 v2_admin_users join, 그 외는 v2_users 전체. */
+/**
+ * role로 사용자 필터. admin은 v2_admin_users join, 그 외는 v2_users 전체.
+ * 현재 호출처 없음 — Phase 3 Task 6 admin 필터 UI에서 사용 예정.
+ */
 export async function getUsersByRole(role: User["role"]): Promise<User[]> {
   const supabase = await createClient();
   if (role === "admin") {

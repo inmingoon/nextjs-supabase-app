@@ -21,6 +21,7 @@ export async function EventParticipantsList({
   }
 
   // 병렬 fetch — N+1이지만 화면당 참여자 수가 작아 우선 단순 구현.
+  // TODO(Phase 3 Task 5 또는 Task 8): getProfilesByIds(.in("id", ids))로 1 round-trip 배치 전환.
   const users = await Promise.all(
     participants.map((p) => getUserById(p.userId)),
   );
