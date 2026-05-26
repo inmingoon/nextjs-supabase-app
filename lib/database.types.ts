@@ -395,7 +395,11 @@ export type Database = {
       }
       v2_get_event_public_users: {
         Args: { p_event_id: string }
-        Returns: { id: string; full_name: string; avatar_url: string }[]
+        Returns: {
+          id: string
+          full_name: string | null
+          avatar_url: string | null
+        }[]
       }
       v2_is_admin: {
         Args: { target_user_id: string }

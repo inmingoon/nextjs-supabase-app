@@ -91,7 +91,9 @@ export async function countParticipantsOfEvent(eventId: string): Promise<number>
  */
 export async function getEventPublicUsers(
   eventId: string,
-): Promise<Array<{ id: string; fullName: string; avatarUrl: string | null }>> {
+): Promise<
+  Array<{ id: string; fullName: string | null; avatarUrl: string | null }>
+> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("v2_get_event_public_users", {
     p_event_id: eventId,
