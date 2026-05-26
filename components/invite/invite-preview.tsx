@@ -60,7 +60,11 @@ export function InvitePreview({ event }: { event: Event }) {
         onClick={handleJoin}
         disabled={!canJoin || isPending}
       >
-        {canJoin ? "참여하기" : "참여 불가 (종료된 이벤트)"}
+        {isPending
+          ? "참여 중..."
+          : canJoin
+            ? "참여하기"
+            : "참여 불가 (종료된 이벤트)"}
       </Button>
     </div>
   );
