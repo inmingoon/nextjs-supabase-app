@@ -4,4 +4,19 @@
 -- 갱신되지 않고 사용자에게는 stale count 가 그대로 노출되는 silent failure.
 -- RLS 는 Realtime 에도 적용되므로 v2_event_participants_select 정책 (host/admin/같은
 -- 이벤트 참여자) 이 그대로 작동 — 외부인은 다른 이벤트의 변화를 받지 못함.
-alter publication supabase_realtime add table public.v2_event_participants;
+--
+-- Idempotency: `ALTER PUBLICATION ... ADD TABLE` 은 PG 16 이하에서 IF NOT EXISTS 미지원.
+-- 두 번째 적용 시 duplicate_object 에러 → 환경 간 migration 재생 시 deploy 실패.
+-- pg_publication_tables 카탈로그 조회 후 분기로 idempotent 보장.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'v2_event_participants'
+  ) then
+    alter publication supabase_realtime add table public.v2_event_participants;
+  end if;
+end $$;

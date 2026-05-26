@@ -26,7 +26,13 @@ export async function joinEvent(eventId: string): Promise<void> {
     event_id: eventId,
     user_id: user.id,
   });
-  if (error && error.code !== "23505") throw error;
+  // 23505 = unique_violation (이미 참여 중) → idempotent silent pass.
+  // supabase-js 가 향후 error.code 표면을 바꿔도 message regex 가 fallback.
+  if (error) {
+    const isDuplicate =
+      error.code === "23505" || /duplicate key/i.test(error.message);
+    if (!isDuplicate) throw error;
+  }
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/my-events");
@@ -36,7 +42,8 @@ export async function joinEvent(eventId: string): Promise<void> {
 /**
  * 현재 로그인 사용자의 참여 기록을 삭제.
  * - 비로그인: 로그인 페이지로 리다이렉트 (정상 경로에서는 발생하지 않음).
- * - 존재하지 않는 행 삭제는 에러가 아님 — Supabase delete 는 0 row 도 success.
+ * - count: "exact" 로 0-row delete 감지 → "이미 탈퇴했거나 권한이 없습니다" 명시 실패.
+ *   (Task 4 review I3 학습 — RLS silent 0-row 가 user trust 를 해친다.)
  */
 export async function leaveEvent(eventId: string): Promise<void> {
   const supabase = await createClient();
@@ -45,12 +52,15 @@ export async function leaveEvent(eventId: string): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from("v2_event_participants")
-    .delete()
+    .delete({ count: "exact" })
     .eq("event_id", eventId)
     .eq("user_id", user.id);
   if (error) throw error;
+  if (count === 0) {
+    throw new Error("참여 기록을 찾을 수 없습니다");
+  }
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/my-events");
