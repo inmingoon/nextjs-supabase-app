@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/form";
 import { makeEventFormSchema, type EventFormValues } from "./event-form-schema";
 import { createEvent, updateEvent } from "@/lib/actions/events";
+import { isRedirectError } from "@/lib/redirect-error";
 
 type Props = {
   mode: "create" | "edit";
@@ -27,31 +28,16 @@ type Props = {
 };
 
 /**
- * Next.js `redirect()`는 NEXT_REDIRECT digest 가 붙은 특수 Error 를 throw 한다.
- * Server Action 호출부의 try/catch 가 이를 swallow 하면 navigation 이 막힌다.
- * `isRedirectError` 는 next 16에서 next/navigation 공개 export 가 아니므로
- * digest 문자열을 직접 검사해 rethrow 한다.
- */
-function isRedirectError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "digest" in e &&
-    typeof (e as { digest: unknown }).digest === "string" &&
-    (e as { digest: string }).digest.startsWith("NEXT_REDIRECT")
-  );
-}
-
-/**
  * 이벤트 생성·수정 공용 폼.
  * Phase 3 Task 4: dummy submit → Server Action 호출로 교체.
  * - useTransition 으로 pending state 관리
- * - cover 파일은 RHF 외부 file input (uncontrolled) → FormData 로 수동 첨부
+ * - cover 파일은 RHF 외부 file input (uncontrolled, useRef) → FormData 로 수동 첨부
  * - Server Action 내부 redirect 결과는 catch 에서 rethrow 해야 navigation 동작
  */
 export function EventForm({ mode, defaultValues, eventId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const schema = makeEventFormSchema({ enforceFutureDate: mode === "create" });
   const form = useForm<EventFormValues>({
     resolver: zodResolver(schema),
@@ -71,11 +57,9 @@ export function EventForm({ mode, defaultValues, eventId }: Props) {
         formData.set("description", values.description ?? "");
         formData.set("eventDate", values.eventDate);
         formData.set("location", values.location);
-        const fileInput = document.getElementById(
-          "event-cover-input",
-        ) as HTMLInputElement | null;
-        if (fileInput?.files?.[0]) {
-          formData.set("cover", fileInput.files[0]);
+        const file = fileInputRef.current?.files?.[0];
+        if (file) {
+          formData.set("cover", file);
         }
         if (mode === "create") {
           await createEvent(formData);
@@ -161,7 +145,7 @@ export function EventForm({ mode, defaultValues, eventId }: Props) {
         <FormItem>
           <FormLabel>커버 이미지 (선택)</FormLabel>
           <FormControl>
-            <Input id="event-cover-input" type="file" accept="image/*" />
+            <Input ref={fileInputRef} type="file" accept="image/*" />
           </FormControl>
           <FormDescription>jpg·png·webp 최대 2MB 권장</FormDescription>
         </FormItem>
