@@ -8,12 +8,12 @@ import { EventShareActions } from "@/components/events/event-share-actions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getEventById } from "@/lib/dummy/events";
+import { getEventById } from "@/lib/queries/events";
 import {
   getParticipantsOfEvent,
   countParticipantsOfEvent,
-} from "@/lib/dummy/participants";
-import { CURRENT_DUMMY_USER } from "@/lib/dummy/users";
+} from "@/lib/queries/participants";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { Pencil } from "lucide-react";
 
 async function EventDetailContent({
@@ -22,12 +22,15 @@ async function EventDetailContent({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = getEventById(id);
+  const event = await getEventById(id);
   if (!event) notFound();
 
-  const participants = getParticipantsOfEvent(event.id);
-  const count = countParticipantsOfEvent(event.id);
-  const isHost = event.createdBy === CURRENT_DUMMY_USER.id;
+  const [participants, count, currentUser] = await Promise.all([
+    getParticipantsOfEvent(event.id),
+    countParticipantsOfEvent(event.id),
+    getCurrentUser(),
+  ]);
+  const isHost = currentUser?.id === event.createdBy;
 
   return (
     <main className="flex-1 px-4 py-6 pb-20">

@@ -176,6 +176,149 @@ export type Database = {
         }
         Relationships: []
       }
+      v2_admin_users: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          id: string
+          reason?: string | null
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "v2_admin_users_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "v2_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "v2_admin_users_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "v2_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v2_event_participants: {
+        Row: {
+          event_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "v2_event_participants_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "v2_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "v2_event_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v2_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v2_events: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          event_date: string
+          id: string
+          invite_code: string
+          location: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          event_date: string
+          id?: string
+          invite_code: string
+          location: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          event_date?: string
+          id?: string
+          invite_code?: string
+          location?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "v2_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v2_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v2_users: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       group_attendance_stats: {
@@ -195,6 +338,30 @@ export type Database = {
           },
         ]
       }
+      v2_events_with_status: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          event_date: string | null
+          id: string | null
+          invite_code: string | null
+          location: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "v2_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v2_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_group_by_invite_token: {
@@ -210,6 +377,26 @@ export type Database = {
         Returns: boolean
       }
       join_group_by_token: { Args: { token: string }; Returns: string }
+      v2_get_event_by_invite_code: {
+        Args: { p_code: string }
+        Returns: {
+          cover_image_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          event_date: string | null
+          id: string | null
+          invite_code: string | null
+          location: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+      }
+      v2_is_admin: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

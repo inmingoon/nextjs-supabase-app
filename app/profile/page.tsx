@@ -1,8 +1,16 @@
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { CURRENT_DUMMY_USER } from "@/lib/dummy/users";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { Separator } from "@/components/ui/separator";
+
+async function ProfileFormSection() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/auth/login");
+  return <ProfileForm user={user} />;
+}
 
 export default function ProfilePage() {
   return (
@@ -10,7 +18,11 @@ export default function ProfilePage() {
       <main className="flex-1 px-4 py-6 pb-20">
         <h1 className="text-2xl font-bold">프로필</h1>
         <div className="mt-6">
-          <ProfileForm user={CURRENT_DUMMY_USER} />
+          <Suspense
+            fallback={<p className="text-muted-foreground">로딩...</p>}
+          >
+            <ProfileFormSection />
+          </Suspense>
         </div>
 
         <Separator className="my-8" />

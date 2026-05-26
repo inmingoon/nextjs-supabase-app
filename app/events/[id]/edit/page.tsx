@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { EventForm } from "@/components/events/event-form";
-import { getEventById } from "@/lib/dummy/events";
+import { getEventById } from "@/lib/queries/events";
 
 async function EditEventContent({
   params,
@@ -10,7 +10,7 @@ async function EditEventContent({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const event = getEventById(id);
+  const event = await getEventById(id);
   if (!event) notFound();
 
   const defaultValues = {

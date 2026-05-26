@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { InvitePreview } from "@/components/invite/invite-preview";
-import { getEventByInviteCode } from "@/lib/dummy/events";
+import { getEventByInviteCode } from "@/lib/queries/events";
 
 async function InviteContent({
   params,
@@ -9,7 +9,7 @@ async function InviteContent({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const event = getEventByInviteCode(code);
+  const event = await getEventByInviteCode(code);
   if (!event) notFound();
 
   return (
