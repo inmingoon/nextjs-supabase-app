@@ -4,28 +4,78 @@ import { Calendar, Users, CalendarCheck, CalendarX } from "lucide-react";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { EventCard } from "@/components/events/event-card";
 import { Button } from "@/components/ui/button";
-import { listAllEventsForAdmin, getRecentEvents } from "@/lib/queries/events";
-import { listAllUsersForAdmin } from "@/lib/queries/users";
+import { createClient } from "@/lib/supabase/server";
+import { getRecentEvents } from "@/lib/queries/events";
+
+/**
+ * 4개 카운트 쿼리를 병렬 실행 — 전체 row를 fetch 하지 않고 count만 받는다.
+ * head:true 로 row body 전송 생략 → 페이로드 최소화.
+ * upcoming/completed는 v2_events_with_status view (status 계산 컬럼) 기준.
+ */
+async function getDashboardMetrics(): Promise<{
+  totalEvents: number;
+  upcomingCount: number;
+  completedCount: number;
+  totalUsers: number;
+}> {
+  const supabase = await createClient();
+  const [totalEvents, upcomingCount, completedCount, totalUsers] =
+    await Promise.all([
+      supabase
+        .from("v2_events")
+        .select("*", { count: "exact", head: true }),
+      supabase
+        .from("v2_events_with_status")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "upcoming"),
+      supabase
+        .from("v2_events_with_status")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "completed"),
+      supabase
+        .from("v2_users")
+        .select("*", { count: "exact", head: true }),
+    ]);
+
+  return {
+    totalEvents: totalEvents.count ?? 0,
+    upcomingCount: upcomingCount.count ?? 0,
+    completedCount: completedCount.count ?? 0,
+    totalUsers: totalUsers.count ?? 0,
+  };
+}
 
 async function DashboardStatsAndRecent() {
-  const [allEvents, recent, allUsers] = await Promise.all([
-    listAllEventsForAdmin(),
+  const [metrics, recent] = await Promise.all([
+    getDashboardMetrics(),
     getRecentEvents(5),
-    listAllUsersForAdmin(),
   ]);
-
-  const totalEvents = allEvents.length;
-  const upcomingCount = allEvents.filter((e) => e.status === "upcoming").length;
-  const completedCount = allEvents.filter((e) => e.status === "completed").length;
-  const totalUsers = allUsers.length;
 
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AdminStatCard label="전체 이벤트" value={totalEvents} icon={Calendar} />
-        <AdminStatCard label="예정 이벤트" value={upcomingCount} icon={CalendarCheck} hint="upcoming" />
-        <AdminStatCard label="종료 이벤트" value={completedCount} icon={CalendarX} hint="completed" />
-        <AdminStatCard label="가입자" value={totalUsers} icon={Users} />
+        <AdminStatCard
+          label="전체 이벤트"
+          value={metrics.totalEvents}
+          icon={Calendar}
+        />
+        <AdminStatCard
+          label="예정 이벤트"
+          value={metrics.upcomingCount}
+          icon={CalendarCheck}
+          hint="upcoming"
+        />
+        <AdminStatCard
+          label="종료 이벤트"
+          value={metrics.completedCount}
+          icon={CalendarX}
+          hint="completed"
+        />
+        <AdminStatCard
+          label="가입자"
+          value={metrics.totalUsers}
+          icon={Users}
+        />
       </div>
 
       <section className="space-y-3">

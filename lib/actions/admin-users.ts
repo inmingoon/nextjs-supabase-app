@@ -1,11 +1,20 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 /**
- * Phase 3 Task 6에서 본격 구현 예정 — 현재는 placeholder.
- * AdminUsersTable의 rowActions onConfirm이 import만 하고 호출은 가능.
- * defense-in-depth: stub 단계부터 requireAdmin 가드를 둬 Task 6 누락 위험 차단.
+ * 관리자 전용 사용자 삭제 — Phase 3 Task 6.
+ *
+ * 3중 가드 + 자기 자신 삭제 차단:
+ * - requireAdmin → 비-admin 즉시 redirect.
+ * - adminId === userId 인 경우 throw — 자기 자신 잠금 사고 방지.
+ *
+ * count:"exact" + 0-row 검증으로 silent success 차단.
+ * v2_users 삭제는 FK cascade로 v2_events / v2_event_participants 정리.
+ *
+ * 감사 로그: console.warn (Vercel 로그 도달). production audit_logs는 v2.x.
  */
 export async function adminDeleteUser({
   userId,
@@ -14,8 +23,30 @@ export async function adminDeleteUser({
   userId: string;
   reason: string;
 }): Promise<void> {
-  await requireAdmin();
-  void userId;
-  void reason;
-  throw new Error("Not implemented yet — built in Phase 3 Task 6");
+  const { userId: adminId } = await requireAdmin();
+  if (adminId === userId) {
+    throw new Error("자기 자신을 삭제할 수 없습니다");
+  }
+
+  const supabase = await createClient();
+  console.warn(`[admin] delete user ${userId}, reason: ${reason || "(none)"}`);
+
+  const { error, count } = await supabase
+    .from("v2_users")
+    .delete({ count: "exact" })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("[adminDeleteUser] DB failure", {
+      userId,
+      code: error.code,
+    });
+    throw new Error("사용자 삭제에 실패했습니다");
+  }
+  if (count === 0) {
+    throw new Error("사용자를 찾을 수 없습니다");
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin");
 }
