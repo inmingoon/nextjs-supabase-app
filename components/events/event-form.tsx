@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -17,6 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { makeEventFormSchema, type EventFormValues } from "./event-form-schema";
+import { createEvent, updateEvent } from "@/lib/actions/events";
 
 type Props = {
   mode: "create" | "edit";
@@ -25,12 +27,31 @@ type Props = {
 };
 
 /**
+ * Next.js `redirect()`는 NEXT_REDIRECT digest 가 붙은 특수 Error 를 throw 한다.
+ * Server Action 호출부의 try/catch 가 이를 swallow 하면 navigation 이 막힌다.
+ * `isRedirectError` 는 next 16에서 next/navigation 공개 export 가 아니므로
+ * digest 문자열을 직접 검사해 rethrow 한다.
+ */
+function isRedirectError(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "digest" in e &&
+    typeof (e as { digest: unknown }).digest === "string" &&
+    (e as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
+/**
  * 이벤트 생성·수정 공용 폼.
- * Phase 2 더미: submit 시 console.log + sonner toast.
- * Phase 3 Task 009에서 Server Action으로 교체 예정.
+ * Phase 3 Task 4: dummy submit → Server Action 호출로 교체.
+ * - useTransition 으로 pending state 관리
+ * - cover 파일은 RHF 외부 file input (uncontrolled) → FormData 로 수동 첨부
+ * - Server Action 내부 redirect 결과는 catch 에서 rethrow 해야 navigation 동작
  */
 export function EventForm({ mode, defaultValues, eventId }: Props) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const schema = makeEventFormSchema({ enforceFutureDate: mode === "create" });
   const form = useForm<EventFormValues>({
     resolver: zodResolver(schema),
@@ -43,17 +64,31 @@ export function EventForm({ mode, defaultValues, eventId }: Props) {
   });
 
   function onSubmit(values: EventFormValues) {
-    // TODO(Phase 3): Server Action 전 values.eventDate 를 kstDateTimeLocalToIso() 로 변환해야 timestamptz 가 KST 시각으로 정확히 저장됨. 미변환 시 9시간 shift.
-    console.log(`[Phase 2 dummy] EventForm submit (${mode})`, {
-      eventId,
-      values,
+    startTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("title", values.title);
+        formData.set("description", values.description ?? "");
+        formData.set("eventDate", values.eventDate);
+        formData.set("location", values.location);
+        const fileInput = document.getElementById(
+          "event-cover-input",
+        ) as HTMLInputElement | null;
+        if (fileInput?.files?.[0]) {
+          formData.set("cover", fileInput.files[0]);
+        }
+        if (mode === "create") {
+          await createEvent(formData);
+        } else if (eventId) {
+          await updateEvent(eventId, formData);
+        }
+      } catch (e) {
+        // NEXT_REDIRECT 는 Next.js navigation 메커니즘 — rethrow 필수
+        if (isRedirectError(e)) throw e;
+        const message = e instanceof Error ? e.message : "저장 실패";
+        toast.error(message);
+      }
     });
-    toast.success(
-      mode === "create"
-        ? "이벤트가 생성되었습니다 (Phase 3에서 DB 저장)"
-        : "이벤트가 수정되었습니다 (Phase 3에서 DB 저장)",
-    );
-    router.push("/my-events");
   }
 
   return (
@@ -123,21 +158,30 @@ export function EventForm({ mode, defaultValues, eventId }: Props) {
           )}
         />
 
+        <FormItem>
+          <FormLabel>커버 이미지 (선택)</FormLabel>
+          <FormControl>
+            <Input id="event-cover-input" type="file" accept="image/*" />
+          </FormControl>
+          <FormDescription>jpg·png·webp 최대 2MB 권장</FormDescription>
+        </FormItem>
+
         <div className="flex gap-2 pt-2">
           <Button
             type="button"
             variant="outline"
             className="flex-1"
             onClick={() => router.back()}
+            disabled={isPending}
           >
             취소
           </Button>
-          <Button
-            type="submit"
-            className="flex-1"
-            disabled={form.formState.isSubmitting}
-          >
-            {mode === "create" ? "이벤트 만들기" : "수정 저장"}
+          <Button type="submit" className="flex-1" disabled={isPending}>
+            {isPending
+              ? "저장 중..."
+              : mode === "create"
+                ? "이벤트 만들기"
+                : "수정 저장"}
           </Button>
         </div>
       </form>
