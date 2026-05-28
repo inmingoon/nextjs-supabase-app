@@ -41,7 +41,7 @@ PASS 기준:
 
 | 시나리오 | 결과 | 비고 |
 | --- | --- | --- |
-| 1. 이벤트 생성 | TBD | |
-| 2. 커버 업로드 | TBD | allowlist (jpg/png/webp + 2MB) 검증 포함 |
-| 3. 이벤트 수정 | TBD | count:exact 0-row 가드 시 "찾을 수 없거나 수정 권한이 없습니다" |
-| 4. 초대 링크 복사 | TBD | clipboard 권한 거부 시 코드 검증으로 PASS |
+| 1. 이벤트 생성 | ✅ PASS | 첫 시도 PASS, /events/{uuid} redirect + KST 표시 |
+| 2. 커버 업로드 | ✅ PASS (fix 후) | 초기 시도에서 "new row violates RLS" 발견 → `0e78d68` storage RLS bypass via service_role admin client 도입 후 재시도 PASS (POST 7.1s, createEvent 3.9s) |
+| 3. 이벤트 수정 | ✅ PASS | dev log: `POST /events/{id}/edit 303 in 3.9s, updateEvent 1210ms`. count:exact + redirect 정상. |
+| 4. 초대 링크 복사 | ✅ PASS | clipboard에 `localhost:3000/invite/{code}` 복사 확인. |
