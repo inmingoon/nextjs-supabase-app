@@ -50,7 +50,13 @@ async function buildStatusSlices(): Promise<StatusSlice[]> {
   };
   for (const row of data ?? []) {
     const s = row.status as EventStatus | null;
-    if (s && s in counts) counts[s]++;
+    if (s && s in counts) {
+      counts[s]++;
+    } else if (s) {
+      // view에 새 status 가 추가됐는데 본 집계가 따라가지 않으면 pie chart 가 silent 로
+      // total < event count 가 된다 — Vercel 로그에서 발견 가능하도록 경고.
+      console.warn(`[analytics] unknown event status dropped: ${s}`);
+    }
   }
   return [
     { status: "upcoming", count: counts.upcoming },

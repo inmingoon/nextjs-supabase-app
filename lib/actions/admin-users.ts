@@ -11,8 +11,14 @@ import { requireAdmin } from "@/lib/auth/require-admin";
  * - requireAdmin → 비-admin 즉시 redirect.
  * - adminId === userId 인 경우 throw — 자기 자신 잠금 사고 방지.
  *
+ * 의도된 동작 (의도해서 막지 않은 것):
+ * - 다른 admin 삭제는 허용 — admin 권한 회수 의도 시 사용. RLS가 admin-only로
+ *   제한하고 self-guard가 마지막 admin 자가삭제만 차단. 운영상 "마지막 admin이
+ *   누구냐" 추적은 v2.x audit_logs 도입 후. v2.0 internal admin 전제 하 허용.
+ *
  * count:"exact" + 0-row 검증으로 silent success 차단.
  * v2_users 삭제는 FK cascade로 v2_events / v2_event_participants 정리.
+ * (cascade로 사라진 events 의 cover blob 정리는 Task 8 추적 — 본 action 은 행 삭제만.)
  *
  * 감사 로그: console.warn (Vercel 로그 도달). production audit_logs는 v2.x.
  */
