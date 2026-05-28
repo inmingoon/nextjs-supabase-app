@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const BUCKET = "event-covers";
 
@@ -9,11 +9,17 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 /**
  * 커버 이미지 업로드 (server-side, Server Action 내부에서 호출).
- * file path: events/{eventId}/cover.{ext} — Storage RLS와 동일 구조.
+ * file path: events/{eventId}/cover.{ext}.
  * 반환: public URL (bucket이 public 이므로 직접 노출 가능).
  *
- * 보안: file.type · file.size · 확장자를 모두 server에서 allowlist 검사한다.
- * client의 accept="image/*"는 hint일 뿐이므로 신뢰하지 않는다.
+ * 보안:
+ * - file.type · file.size · 확장자를 모두 server에서 allowlist 검사.
+ *   client의 accept="image/*"는 hint일 뿐이므로 신뢰하지 않음.
+ * - **service-role client 로 RLS bypass**. @supabase/ssr 의 SSR client 는 storage
+ *   REST API 호출 시 user JWT 를 Authorization 헤더에 propagate 하지 못해 anon 으로
+ *   평가되고 default deny 가 난다. 호출자(createEvent/updateEvent 등)가
+ *   requireUser + v2_events INSERT/UPDATE 정책으로 권한을 이미 강제하므로 path 가
+ *   사용자 input 으로 위변조될 수 없다 → service-role 사용이 안전.
  */
 export async function uploadEventCover(
   eventId: string,
@@ -28,7 +34,7 @@ export async function uploadEventCover(
   const rawExt = (file.name.split(".").pop() ?? "").toLowerCase();
   const ext = ALLOWED_EXT.has(rawExt) ? rawExt : "jpg";
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const path = `events/${eventId}/cover.${ext}`;
 
   const { error } = await supabase.storage
@@ -42,10 +48,11 @@ export async function uploadEventCover(
 
 /**
  * 이벤트 삭제 시 호출 — 확장자 추측 회피를 위해 list → remove 패턴.
- * 폴더가 비어 있으면 no-op.
+ * 폴더가 비어 있으면 no-op. service-role client 사용 (uploadEventCover 와 동일 사유).
+ * 호출자가 requireUser/requireAdmin 으로 권한 검증을 책임진다.
  */
 export async function deleteEventCover(eventId: string): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data: list } = await supabase.storage
     .from(BUCKET)
     .list(`events/${eventId}`);
@@ -59,7 +66,7 @@ export async function deleteEventCover(eventId: string): Promise<void> {
  * (현재 events.ts에서는 upload 반환값을 그대로 쓰지만, 향후 재계산용으로 노출.)
  */
 export async function getPublicUrl(path: string): Promise<string> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
