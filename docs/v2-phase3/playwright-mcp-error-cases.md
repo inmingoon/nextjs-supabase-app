@@ -45,14 +45,34 @@ dev server: `http://localhost:3000`
 1. participant1로 host1 이벤트의 cover 이미지 업로드 시도 (개발자 도구 또는 cURL로 Server Action 호출)
 2. Expected: `uploadEventCover` allowlist 통과 → Storage RLS INSERT 거부 (path 매칭 실패) → toast 에러 + event row는 미변경
 
-## 결과 (실행 후 기록)
+## 결과 (controller 자동 + 사용자 협력)
 
 | 시나리오 | 결과 | 비고 |
 | --- | --- | --- |
-| 1. 404 이벤트 | TBD | |
-| 2. 404 invite | TBD | |
-| 3. Zod validation | TBD | client + server 양쪽 메시지 정상 |
-| 4. 비로그인 redirect | TBD | proxy whitelist + safe-next |
-| 5. OAuth open-redirect 차단 | TBD | Task 3 fix safe-next.ts 검증 |
-| 6. RLS UPDATE 거부 | TBD | count:exact 0-row throw |
-| 7. Storage RLS 거부 | TBD | path 매칭 실패 |
+| 1. 404 이벤트 | TBD | OAuth 로그인 후 검증 (로그인 안 하면 proxy redirect로 404 도달 못 함) |
+| 2. 404 invite | ✅ PASS | `/invite/wrong-code-does-not-exist` → "404: This page could not be found." (whitelist 통과 + notFound) |
+| 3. Zod validation | TBD | form 입력 인터랙티브 — OAuth 후 검증 |
+| 4. 비로그인 redirect | ✅ PASS | `/my-events` → `/auth/login?redirect=%2Fmy-events`. `/events/new` → 동일 패턴. `/admin` → `/admin/login?redirect=%2Fadmin` (proxy admin 분기 정상) |
+| 5. OAuth open-redirect 차단 | ✅ PASS | `?code=fake&next=https://evil.com/x` → `/auth/error?error=PKCE...` (same-origin). evil.com 도달 안 함 |
+| 6. RLS UPDATE 거부 | TBD | OAuth 로그인 후 |
+| 7. Storage RLS 거부 | TBD | OAuth 로그인 후 |
+
+## Controller 자동 검증 추가 항목 (OAuth 무관 인프라 검증)
+
+위 #2/#4/#5와 별개로, controller가 직접 확인한 추가 항목:
+
+| 항목 | 결과 | 비고 |
+| --- | --- | --- |
+| `/auth/login` LoginCard UI 렌더 | ✅ PASS | "이벤트에 참여하기" + "Google 계정으로 빠르게 시작하세요." + "Google로 계속하기" 버튼 (Task 3 spec 일치) |
+| `/admin/login?reason=not_admin` UI + 분기 메시지 | ✅ PASS | "관리자 로그인" + "관리자 권한이 없습니다." + ShieldAlert icon + "Google로 관리자 로그인" (Task 3 admin-login-card spec 일치) |
+
+## 사용자 협력 필요 시나리오 (OAuth 의존)
+
+다음 시나리오는 Google OAuth provider 흐름 또는 인터랙티브 form 입력이 필요해 controller가 자동 실행 불가:
+
+- host-flow 1~4 (이벤트 생성·업로드·수정·복사)
+- participant-flow 1~4 (초대 가입·목록 RPC·my-events·중복+Realtime)
+- admin-flow 1~8 (대시보드·검색·삭제·차단·차트·self-guard·0-row·cross-admin)
+- error-cases 1·3·6·7 (404 이벤트·validation·RLS UPDATE·Storage RLS)
+
+사용자가 위 시나리오를 브라우저에서 실행 후 결과를 알려주시면 각 docs 파일의 결과 표를 추가 commit으로 채웁니다.
