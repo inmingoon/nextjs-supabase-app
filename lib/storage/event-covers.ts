@@ -61,12 +61,3 @@ export async function deleteEventCover(eventId: string): Promise<void> {
   await supabase.storage.from(BUCKET).remove(paths);
 }
 
-/**
- * 외부에서 path → public URL 변환이 필요할 때 사용.
- * (현재 events.ts에서는 upload 반환값을 그대로 쓰지만, 향후 재계산용으로 노출.)
- */
-export async function getPublicUrl(path: string): Promise<string> {
-  const supabase = createAdminClient();
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
-}
