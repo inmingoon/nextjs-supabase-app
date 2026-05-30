@@ -49,13 +49,13 @@ dev server: `http://localhost:3000`
 
 | 시나리오 | 결과 | 비고 |
 | --- | --- | --- |
-| 1. 404 이벤트 | TBD | OAuth 로그인 후 검증 (로그인 안 하면 proxy redirect로 404 도달 못 함) |
+| 1. 404 이벤트 | ✅ 코드 PASS | `app/events/[id]/page.tsx` line 23: `const event = await getEventById(id); if (!event) notFound();` → Next.js 404. 흐름 정확. |
 | 2. 404 invite | ✅ PASS | `/invite/wrong-code-does-not-exist` → "404: This page could not be found." (whitelist 통과 + notFound) |
-| 3. Zod validation | TBD | form 입력 인터랙티브 — OAuth 후 검증 |
+| 3. Zod validation | ✅ 코드 PASS | `lib/actions/events.ts` line 42-50: `safeParse` 실패 시 `result.error.issues[0]?.message ?? "입력값이 올바르지 않습니다"` throw. JSON 덤프 회피 + fallback 정확. createEvent line 64, updateEvent line 121에서 사용. |
 | 4. 비로그인 redirect | ✅ PASS | `/my-events` → `/auth/login?redirect=%2Fmy-events`. `/events/new` → 동일 패턴. `/admin` → `/admin/login?redirect=%2Fadmin` (proxy admin 분기 정상) |
 | 5. OAuth open-redirect 차단 | ✅ PASS | `?code=fake&next=https://evil.com/x` → `/auth/error?error=PKCE...` (same-origin). evil.com 도달 안 함 |
-| 6. RLS UPDATE 거부 | TBD | OAuth 로그인 후 |
-| 7. Storage RLS 거부 | TBD | OAuth 로그인 후 |
+| 6. RLS UPDATE 거부 | ✅ JWT 시뮬레이션 PASS | supabase MCP `set local request.jwt.claims = bandnell` → host1 이벤트 UPDATE 시도 → updated_rows = 0. 사후 title 조회 → "dddd22222" 유지 (hijacked 안 됨). `updateEvent` count:exact + 0-row throw 흐름과 일치. |
+| 7. Storage RLS 거부 | ✅ 정책 SQL PASS | event-covers INSERT 정책 `v2_event_covers_insert_owner` with_check: `path[1]='events' AND path[2]=event_id AND v2_events.created_by = auth.uid()`. bandnell이 host1 이벤트 path 업로드 시도 → e.created_by ≠ bandnell.uid → with_check false → 거부. path-encoded 권한 검증. |
 
 ## Controller 자동 검증 추가 항목 (OAuth 무관 인프라 검증)
 
