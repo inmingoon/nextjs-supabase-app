@@ -73,11 +73,11 @@ dev server: `http://localhost:3000`
 
 | 시나리오 | 결과 | 비고 |
 | --- | --- | --- |
-| 1. admin 로그인 + 대시보드 | TBD | 4 StatCard count 정확성 |
-| 2. 이벤트 검색 | TBD | |
-| 3. 이벤트 삭제 + cover 정리 | TBD | deleteEventCover 선행 |
-| 4. 비-admin 차단 | TBD | requireAdmin 3중 가드 검증 |
-| 5. 통계 차트 + 다크모드 | TBD | analytics 좁힌 SELECT |
-| 6. self-deletion guard | TBD | adminId === userId throw |
-| 7. 0-row error path | TBD | count:exact → "찾을 수 없습니다" |
-| 8. cross-admin 삭제 | TBD | 의도된 동작 + cascade blob orphan 관찰 |
+| 1. admin 로그인 + 대시보드 | ✅ requireAdmin SQL PASS | supabase MCP `set local request.jwt.claims = host1` 시뮬레이션 → `v2_admin_users` count = 1 (admin 통과). 데이터: total_events 9, upcoming 6, completed 3, total_users 2. UI 4 StatCard 렌더링은 사용자 confirmation 필요. **시나리오 진행 중 silent breakage #7 발견**: v2_is_admin 함수 stable+SET 충돌 (PG 0A000) — v2_get_event_by_invite_code 와 동일 패턴. fix migration `20260530000001` 적용. |
+| 2. 이벤트 검색 | ⏳ UI only | 200ms debounce + 클라이언트 filter — 코드 정상이나 UX는 사용자 확인 |
+| 3. 이벤트 삭제 + cover 정리 | ✅ 코드+FK PASS | `adminDeleteEvent` 흐름: requireAdmin → console.warn audit → deleteEventCover (silent fail OK) → count:exact delete → 0-row throw / PG error sanitize. cascade FK 직접 확인: v2_event_participants_event_id_fkey ON DELETE CASCADE. UI 휴지통 클릭 흐름은 사용자 confirmation 옵션. |
+| 4. 비-admin 차단 | ✅ SQL PASS | bandnell JWT 시뮬레이션 → v2_admin_users count = 0. requireAdmin → `/admin/login?reason=not_admin` redirect 흐름. |
+| 5. 통계 차트 + 다크모드 | ✅ 데이터 SQL PASS | buildStatusSlices 동등 query: upcoming 6 / completed 3 / ongoing 0. 시드 데이터에 ongoing 없음 — pie chart 렌더는 UI 확인. 다크모드 토글은 UI only. |
+| 6. self-deletion guard | ✅ 코드 PASS | `adminDeleteUser` line 33-35: `if (adminId === userId) throw new Error("자기 자신을 삭제할 수 없습니다")` — spec 정확. |
+| 7. 0-row error path | ✅ 코드 PASS | `adminDeleteUser` line 52-54 + `adminDeleteEvent` line 52-54 모두 `count === 0 → throw "사용자/이벤트를 찾을 수 없습니다"` — spec 정확. |
+| 8. cross-admin 삭제 | ✅ 의도된 동작 PASS | `adminDeleteUser`에 self-guard 외 다른 admin 삭제 가드 없음 (spec 의도). cascade로 v2_events/v2_event_participants 정리. **cover blob orphan는 Task 8 추적 항목** — `adminDeleteEvent` 와 달리 `adminDeleteUser` 에서는 cover 정리 없이 cascade 만. |
