@@ -39,7 +39,7 @@ dev server: `http://localhost:3000`
 | 시나리오 | 결과 | 비고 |
 | --- | --- | --- |
 | 1a. 시크릿 창 invite 페이지 진입 | ✅ PASS (fix 후) | 초기 시도에서 404 발견 → `set local row_security = off` ↔ `stable` 충돌 + view security_invoker invoker rights 결합 결함. v2_get_event_by_invite_code 함수 정정 (table 직접 select + SET 제거) 후 시크릿 창에서 InvitePreview 정상 표시. |
-| 1b. "참여하기" → Google OAuth → joinEvent | TBD | participant1 계정으로 인증 후 검증 필요 |
-| 2. 참여자 목록 (RLS RPC) | TBD | Task 3 v2_get_event_public_users — RLS 차단 시 모두 익명 |
+| 1b. "참여하기" → Google OAuth → joinEvent | ✅ PASS (fix 후) | 초기 시도에서 PG 23503 (v2_event_participants_user_id_fkey) 발견 → v2 trigger 등록 이전 가입자 (bandnell@gmail.com) v2_users row 누락. backfill migration `20260528000001_v2_users_backfill.sql` 적용 후 joinEvent INSERT 정상, /events/{id} redirect. |
+| 2. 참여자 목록 (RLS RPC) | ✅ PASS (2-fix 후) | 1차 발견: v2_get_event_public_users RPC migration이 SQL Editor에 적용 안 됨 (function does not exist) → 사용자가 직접 적용 후 EventParticipantsList Avatar 정상 표시. 2차 발견: count "참여자 0명" 잔존 — countParticipantsOfEvent (direct select)는 RLS로 차단되는데 RPC (SECURITY DEFINER)는 통과하는 권한 비대칭. page.tsx에서 getEventPublicUsers 단일 호출 → users.length를 count로 사용 + EventParticipantsList에 users props 전달로 비대칭 자체 우회. 검증: "참여자 1명" / "참여자 (1)" / 이용성 Avatar 모두 정상. |
 | 3. my-events 참여한 탭 | TBD | |
 | 4. 중복 참여 + Realtime | TBD | 23505 silent + Task 5 publication 적용 검증 |

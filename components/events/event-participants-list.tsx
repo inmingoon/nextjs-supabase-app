@@ -1,18 +1,21 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getEventPublicUsers } from "@/lib/queries/participants";
+
+type ParticipantUser = {
+  id: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+};
 
 /**
- * 참여자 아바타 그리드. server 컴포넌트 — SECURITY DEFINER RPC 한 번으로 모든 참여자 공개 프로필을 조회.
- * Task 2 review Important #1 (RLS self/admin 제한으로 다른 참여자 표시 차단) + #3 (N+1) 동시 해소.
- * 호출자는 해당 이벤트의 host 또는 참여자여야 데이터가 반환됨 (서버 측 검증).
+ * 참여자 아바타 그리드. server 컴포넌트지만 자체 fetch 없이 부모(page.tsx)가
+ * getEventPublicUsers RPC로 가져온 결과를 그대로 받음 — count와 list가 동일 소스를
+ * 공유해 RLS direct-select와 SECURITY DEFINER RPC 간 권한 비대칭을 회피.
  */
-export async function EventParticipantsList({
-  eventId,
+export function EventParticipantsList({
+  users,
 }: {
-  eventId: string;
+  users: ParticipantUser[];
 }) {
-  const users = await getEventPublicUsers(eventId);
-
   if (users.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
