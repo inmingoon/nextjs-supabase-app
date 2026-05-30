@@ -1,19 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import type { EventParticipant } from "@/types/event-participant";
 import type { Event } from "@/types/event";
 import type { Database } from "@/lib/database.types";
 
-type ParticipantRow = Database["public"]["Tables"]["v2_event_participants"]["Row"];
 type EventWithStatusRow = Database["public"]["Views"]["v2_events_with_status"]["Row"];
-
-/** v2_event_participants row → 외부 EventParticipant 변환. */
-function mapParticipantRow(row: ParticipantRow): EventParticipant {
-  return {
-    eventId: row.event_id,
-    userId: row.user_id,
-    joinedAt: row.joined_at,
-  };
-}
 
 /** v2_events_with_status row → 외부 Event 변환. */
 function mapEventRow(row: EventWithStatusRow): Event {
@@ -30,19 +19,6 @@ function mapEventRow(row: EventWithStatusRow): Event {
     createdAt: row.created_at!,
     updatedAt: row.updated_at!,
   };
-}
-
-/** 특정 이벤트의 참여자 목록 (가입 빠른 순). */
-export async function getParticipantsOfEvent(
-  eventId: string,
-): Promise<EventParticipant[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("v2_event_participants")
-    .select("*")
-    .eq("event_id", eventId)
-    .order("joined_at", { ascending: true });
-  return (data ?? []).map(mapParticipantRow);
 }
 
 /**
@@ -72,16 +48,6 @@ export async function getEventsOfParticipant(userId: string): Promise<Event[]> {
     .map((l) => byId.get(l.event_id))
     .filter((e): e is EventWithStatusRow => e !== undefined)
     .map(mapEventRow);
-}
-
-/** 특정 이벤트의 참여자 수 (head:true로 row 없이 카운트만). */
-export async function countParticipantsOfEvent(eventId: string): Promise<number> {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("v2_event_participants")
-    .select("*", { count: "exact", head: true })
-    .eq("event_id", eventId);
-  return count ?? 0;
 }
 
 /**
