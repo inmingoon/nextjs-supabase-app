@@ -55,7 +55,7 @@ dev server: `http://localhost:3000`
 | 4. 비로그인 redirect | ✅ PASS | `/my-events` → `/auth/login?redirect=%2Fmy-events`. `/events/new` → 동일 패턴. `/admin` → `/admin/login?redirect=%2Fadmin` (proxy admin 분기 정상) |
 | 5. OAuth open-redirect 차단 | ✅ PASS | `?code=fake&next=https://evil.com/x` → `/auth/error?error=PKCE...` (same-origin). evil.com 도달 안 함 |
 | 6. RLS UPDATE 거부 | ✅ JWT 시뮬레이션 PASS | supabase MCP `set local request.jwt.claims = bandnell` → host1 이벤트 UPDATE 시도 → updated_rows = 0. 사후 title 조회 → "dddd22222" 유지 (hijacked 안 됨). `updateEvent` count:exact + 0-row throw 흐름과 일치. |
-| 7. Storage RLS 거부 | ✅ 정책 SQL PASS | event-covers INSERT 정책 `v2_event_covers_insert_owner` with_check: `path[1]='events' AND path[2]=event_id AND v2_events.created_by = auth.uid()`. bandnell이 host1 이벤트 path 업로드 시도 → e.created_by ≠ bandnell.uid → with_check false → 거부. path-encoded 권한 검증. |
+| 7. Storage RLS 거부 | ✅ 정책 SQL PASS (단, **실제 호출 path 에선 미평가**) | event-covers INSERT 정책 `v2_event_covers_insert_owner` with_check 식 자체는 정확 (path[1]='events' AND path[2]=event_id AND v2_events.created_by = auth.uid()). **그러나 commit `0e78d68` 이후 lib/storage/event-covers.ts 는 service_role admin client 로 RLS 를 우회**하므로 본 정책은 우리 코드의 호출 path 에서 평가되지 않는다. 실제 안전성은 `updateEvent` / `createEvent` 의 v2_events UPDATE 권한 검증에서 와서 cover 업로드에 도달하지 못하는 부수효과 + path 가 `events/{eventId}/...` 형태로 우리 코드가 통제. 본 storage 정책은 anon 직접 호출 또는 다른 client 우회 시점의 backstop 으로만 유효. |
 
 ## Controller 자동 검증 추가 항목 (OAuth 무관 인프라 검증)
 
