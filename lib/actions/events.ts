@@ -90,17 +90,28 @@ export async function createEvent(formData: FormData): Promise<void> {
     }
     // 23505 = unique_violation → invite_code 재생성하고 retry
     if (error?.code !== "23505") {
-      throw error;
+      console.error("[createEvent] DB failure", { code: error?.code });
+      throw new Error("이벤트 생성에 실패했습니다");
     }
   }
   if (!inserted) throw new Error("invite_code 생성 3회 실패");
 
   if (cover && cover.size > 0) {
     const url = await uploadEventCover(inserted.id, cover);
-    await supabase
+    const { error: coverErr, count: coverCount } = await supabase
       .from("v2_events")
-      .update({ cover_image_url: url })
+      .update({ cover_image_url: url }, { count: "exact" })
       .eq("id", inserted.id);
+    if (coverErr) {
+      console.error("[createEvent] cover URL update failure", {
+        eventId: inserted.id,
+        code: coverErr.code,
+      });
+      throw new Error("커버 URL 저장에 실패했습니다");
+    }
+    if (coverCount === 0) {
+      throw new Error("커버 URL 저장에 실패했습니다 (event 행 없음)");
+    }
   }
 
   revalidatePath("/");
@@ -138,17 +149,30 @@ export async function updateEvent(
       { count: "exact" },
     )
     .eq("id", eventId);
-  if (error) throw error;
+  if (error) {
+    console.error("[updateEvent] DB failure", { eventId, code: error.code });
+    throw new Error("이벤트 수정에 실패했습니다");
+  }
   if (count === 0) {
     throw new Error("이벤트를 찾을 수 없거나 수정 권한이 없습니다");
   }
 
   if (cover && cover.size > 0) {
     const url = await uploadEventCover(eventId, cover);
-    await supabase
+    const { error: coverErr, count: coverCount } = await supabase
       .from("v2_events")
-      .update({ cover_image_url: url })
+      .update({ cover_image_url: url }, { count: "exact" })
       .eq("id", eventId);
+    if (coverErr) {
+      console.error("[updateEvent] cover URL update failure", {
+        eventId,
+        code: coverErr.code,
+      });
+      throw new Error("커버 URL 저장에 실패했습니다");
+    }
+    if (coverCount === 0) {
+      throw new Error("커버 URL 저장에 실패했습니다 (event 행 없음)");
+    }
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -173,7 +197,10 @@ export async function deleteEvent(eventId: string): Promise<void> {
     .from("v2_events")
     .delete({ count: "exact" })
     .eq("id", eventId);
-  if (error) throw error;
+  if (error) {
+    console.error("[deleteEvent] DB failure", { eventId, code: error.code });
+    throw new Error("이벤트 삭제에 실패했습니다");
+  }
   if (count === 0) {
     throw new Error("이벤트를 찾을 수 없거나 삭제 권한이 없습니다");
   }

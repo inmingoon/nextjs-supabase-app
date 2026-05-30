@@ -31,7 +31,10 @@ export async function joinEvent(eventId: string): Promise<void> {
   if (error) {
     const isDuplicate =
       error.code === "23505" || /duplicate key/i.test(error.message);
-    if (!isDuplicate) throw error;
+    if (!isDuplicate) {
+      console.error("[joinEvent] DB failure", { eventId, code: error.code });
+      throw new Error("이벤트 참여에 실패했습니다");
+    }
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -57,7 +60,10 @@ export async function leaveEvent(eventId: string): Promise<void> {
     .delete({ count: "exact" })
     .eq("event_id", eventId)
     .eq("user_id", user.id);
-  if (error) throw error;
+  if (error) {
+    console.error("[leaveEvent] DB failure", { eventId, code: error.code });
+    throw new Error("이벤트 탈퇴에 실패했습니다");
+  }
   if (count === 0) {
     throw new Error("참여 기록을 찾을 수 없습니다");
   }
