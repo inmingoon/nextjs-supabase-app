@@ -77,14 +77,16 @@ export async function getUpcomingEventsPage(
 }
 ```
 
-- [ ] **Step 2: 기존 `getUpcomingEvents` 제거**
+- [ ] **Step 2: 기존 `getUpcomingEvents` 는 그대로 둔다**
 
-`getUpcomingEvents`(line 68~78) 함수를 통째로 삭제한다. (호출처는 `app/page.tsx` 한 곳뿐이며 Task 3에서 교체된다. `getRecentEvents`는 admin 에서 사용하므로 **건드리지 않는다**.)
+`getUpcomingEvents`(line 68~78) 는 **이번 task 에서 삭제하지 않는다.** 유일한 호출처인
+`app/page.tsx` 가 Task 3 에서 교체될 때 함께 제거한다 — 그래야 각 task 가 commit 시점에
+빌드 green 을 유지한다. (`getRecentEvents` 는 admin 에서 계속 사용하므로 영구 보존.)
 
-- [ ] **Step 3: tsc — 일시적 에러 확인**
+- [ ] **Step 3: tsc — green 확인**
 
 Run: `npx tsc --noEmit`
-Expected: `app/page.tsx` 에서 `getUpcomingEvents` 가 사라져 에러 1건 (Task 3에서 해소). 그 외 `lib/queries/events.ts` 자체는 에러 없어야 함.
+Expected: 0 errors. (새 함수/상수는 추가만 했고 기존 코드는 그대로라 빌드가 깨지지 않는다.)
 
 - [ ] **Step 4: commit**
 
@@ -218,7 +220,8 @@ export function UpcomingEventsInfinite({ initialEvents }: Props) {
 }
 ```
 
-(이 컴포넌트는 `EventCardSkeleton` 에 의존한다 — Task 6 전에 tsc 가 통과하려면 Task 6의 `event-card-skeleton.tsx` 를 먼저 만들어도 된다. 순서를 지키려면 Step 4 tsc 는 Task 6 완료 후 통과한다. 아래 Step 3 참고.)
+(이 컴포넌트는 `EventCardSkeleton` 에 의존한다 — **실행 순서상 Task 6(스켈레톤)을 먼저 끝낸
+뒤** 이 Task 3 을 진행하므로 `event-card-skeleton.tsx` 는 이미 존재한다.)
 
 - [ ] **Step 2: `app/page.tsx` 를 무한 스크롤로 교체**
 
@@ -265,23 +268,27 @@ async function UpcomingEventsSection() {
 </Suspense>
 ```
 
-- [ ] **Step 3: tsc + lint (Task 6 의존)**
+- [ ] **Step 3: 이제 미사용이 된 `getUpcomingEvents` 제거**
 
-Run: `npx tsc --noEmit; npm run lint`
-Expected: `EventCardSkeleton`/`EventListSkeleton` 미존재 에러가 나면 Task 6 을 먼저 수행한 뒤 재실행. 둘 다 존재하면 0 errors / 0 problems.
+`app/page.tsx` 가 더 이상 `getUpcomingEvents` 를 쓰지 않으므로 `lib/queries/events.ts` 의
+`getUpcomingEvents` 함수(line 68~78)를 통째로 삭제한다. (`getRecentEvents` 는 admin 에서
+계속 쓰므로 **남긴다**.) 전체 grep 으로 다른 호출처가 없음을 재확인:
 
-- [ ] **Step 4: build + 홈 동작 확인**
+Run: `git grep -n "getUpcomingEvents\b" -- "*.ts" "*.tsx"`
+Expected: `getUpcomingEventsPage` 외 `getUpcomingEvents` 단독 호출처 0건.
 
-Run: `npm run build`
-Expected: 모든 route PASS.
+- [ ] **Step 4: tsc + lint + build**
 
-Playwright MCP: dev 서버(`npm run dev`) 기동 후 `/` 접속 → "다가오는 이벤트" 그리드 렌더 확인. (데이터가 9개 미만이면 센티넬 미표시 = 정상. 9개 이상이면 스크롤 시 추가 로드 — Task 8 에서 데이터 보강 후 정식 검증.)
+Run: `npx tsc --noEmit; npm run lint; npm run build`
+Expected: 0 errors / 0 problems / 모든 route PASS. (Task 6 이 선행되어 `EventCardSkeleton`/`EventListSkeleton` 이 이미 존재하므로 green.)
+
+Playwright MCP(선택): dev 서버(`npm run dev`) 기동 후 `/` 접속 → "다가오는 이벤트" 그리드 렌더 확인. (데이터가 9개 미만이면 센티넬 미표시 = 정상. 정식 스크롤 검증은 Task 8 에서 데이터 보강 후.)
 
 - [ ] **Step 5: commit**
 
 ```bash
-git add components/events/upcoming-events-infinite.tsx app/page.tsx
-git commit -m "feat(v2): 홈 이벤트 그리드 무한 스크롤 (native IntersectionObserver)"
+git add components/events/upcoming-events-infinite.tsx app/page.tsx lib/queries/events.ts
+git commit -m "feat(v2): 홈 이벤트 그리드 무한 스크롤 (native IntersectionObserver) + getUpcomingEvents 제거"
 ```
 
 ---
