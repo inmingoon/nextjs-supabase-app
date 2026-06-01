@@ -12,6 +12,7 @@ import { getEventById } from "@/lib/queries/events";
 import { getEventPublicUsers } from "@/lib/queries/participants";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { Pencil } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 async function EventDetailContent({
   params,
@@ -76,8 +77,13 @@ export default function EventDetailPage({
     <div className="flex min-h-screen flex-col">
       <Suspense
         fallback={
-          <main className="flex-1 px-4 py-6 pb-20">
-            <p className="text-muted-foreground">로딩...</p>
+          <main className="flex-1 space-y-6 px-4 py-6 pb-20">
+            <Skeleton className="h-48 w-full rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-1/3" />
+            </div>
           </main>
         }
       >
