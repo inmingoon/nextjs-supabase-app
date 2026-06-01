@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -10,57 +10,56 @@ type Props = {
 };
 
 /**
- * v2_event_participants 의 INSERT/DELETE 이벤트를 구독해 카운트를 즉시 갱신.
+ * 참여자 카운트를 broadcast 로 실시간 갱신.
+ *
+ * 모델 (Phase 4-A):
+ *   joinEvent/leaveEvent Server Action 이 DB 변경 성공 시 서버에서
+ *   `event:{id}:participants` 채널로 { delta:±1 } broadcast 를 송신한다.
+ *   이 컴포넌트는 그 broadcast 를 구독해 카운트를 누적 갱신한다.
+ *   postgres_changes(=RLS·publication 의존) 를 쓰지 않으므로 호스트/참여자/비참여자
+ *   전원이 동일하게 수신한다 (Phase 3 후속 추적 #1 복원).
+ *
+ * drift 보정:
+ *   broadcast 는 best-effort 라 메시지 유실 시 카운트가 어긋날 수 있다.
+ *   구독 성공(SUBSCRIBED) 시 + 탭 재가시화 시 서버 카운트를 1회 재조회해 덮어쓴다.
  *
  * 초기값:
- *   page.tsx 가 `getEventPublicUsers` RPC 결과의 length 로 계산해 prop 으로 전달
- *   (commit 237063c — RLS direct count 비대칭 회피).
- *
- * Realtime trade-off:
- *   마이그레이션 20260530000000 이 RLS 정책의 self-recursive 조건 4 를 제거한 후,
- *   `v2_event_participants_select` 가 self/host/admin 3 조건만 평가한다. Realtime
- *   채널도 같은 RLS 가 적용되므로, **비호스트 참여자는 다른 참여자의 INSERT/DELETE
- *   이벤트를 수신하지 못한다**. 결과:
- *   - host / admin: 자기 이벤트의 모든 참여자 변동을 즉시 카운트 반영.
- *   - 비호스트 참여자: 본인 가입/탈퇴 외 변동은 페이지 새로고침 시 반영.
- *   ROADMAP-v2.md 후속 추적 #1 (broadcast 채널 또는 보조 DEFINER 함수로 복원) 참조.
- *
- * publication: postgres_changes 가 작동하려면 v2_event_participants 가
- *   supabase_realtime publication 에 등록되어야 함 (migration 20260526000001 +
- *   1f464a6 에서 직접 apply).
+ *   page.tsx 가 getEventPublicUsers RPC 결과 length 로 계산해 prop 으로 전달.
  */
 export function EventParticipantsCount({ eventId, initialCount }: Props) {
   const [count, setCount] = useState(initialCount);
+
+  // 서버 카운트 1회 재조회 (broadcast 유실 보정). 클라이언트도 같은 RPC 호출 가능.
+  const resync = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase.rpc("v2_get_event_public_users", {
+      p_event_id: eventId,
+    });
+    if (data) setCount(data.length);
+  }, [eventId]);
 
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel(`event:${eventId}:participants`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "v2_event_participants",
-          filter: `event_id=eq.${eventId}`,
-        },
-        () => setCount((c) => c + 1),
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "v2_event_participants",
-          filter: `event_id=eq.${eventId}`,
-        },
-        () => setCount((c) => Math.max(0, c - 1)),
-      )
-      .subscribe();
+      .on("broadcast", { event: "participant_change" }, ({ payload }) => {
+        const delta = (payload as { delta?: number }).delta ?? 0;
+        setCount((c) => Math.max(0, c + delta));
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") resync();
+      });
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") resync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
-  }, [eventId]);
+  }, [eventId, resync]);
 
   return (
     <p className="flex items-center gap-2">
