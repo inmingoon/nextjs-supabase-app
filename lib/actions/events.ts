@@ -12,6 +12,8 @@ import {
 import { kstDateTimeLocalToIso } from "@/lib/datetime";
 import { requireUser } from "@/lib/auth/require-user";
 import { makeEventFormSchema } from "@/components/events/event-form-schema";
+import { getUpcomingEventsPage, UPCOMING_PAGE_SIZE } from "@/lib/queries/events";
+import type { Event } from "@/types/event";
 
 const createSchema = makeEventFormSchema({ enforceFutureDate: true });
 const updateSchema = makeEventFormSchema({ enforceFutureDate: false });
@@ -207,4 +209,13 @@ export async function deleteEvent(eventId: string): Promise<void> {
 
   revalidatePath("/my-events");
   revalidatePath("/");
+}
+
+/**
+ * 홈 "다가오는 이벤트" 무한 스크롤 — offset 이후 다음 페이지를 반환.
+ * offset 음수/비정수는 0 으로 방어 (클라이언트 입력 신뢰 금지).
+ */
+export async function loadMoreUpcomingEvents(offset: number): Promise<Event[]> {
+  const safeOffset = Number.isInteger(offset) && offset > 0 ? offset : 0;
+  return getUpcomingEventsPage(safeOffset, UPCOMING_PAGE_SIZE);
 }
