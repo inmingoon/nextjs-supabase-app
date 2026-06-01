@@ -57,7 +57,7 @@
 
 ### Phase 3 후속 추적 항목 (Phase 4 또는 v2.x)
 
-1. ~~**Realtime UX 복원**~~ → **Phase 4-A 에서 복원 (코드)**: 서버 측 broadcast 채택. joinEvent/leaveEvent Server Action 이 실제 DB 변동 시에만 `event:{id}:participants` 채널로 `{delta:±1}` 송신(`channel.send` HTTP), `EventParticipantsCount` 가 broadcast 구독 + SUBSCRIBED/재가시화 시 서버 재동기화. postgres_changes(RLS·publication 의존) 제거로 호스트/참여자/비참여자 전원 수신. **런타임 2세션 UI 검증은 수동 대기**(authed OAuth 2세션 필요 — 자동화 보류, Phase 4-C 배포 후 + 사용자 수동).
+1. ~~**Realtime UX 복원**~~ → **Phase 4-A 에서 복원 (코드)**: 서버 측 broadcast 채택. joinEvent/leaveEvent Server Action 이 실제 DB 변동 시에만 `event:{id}:participants` 채널로 `{delta:±1}` 송신(`channel.send` HTTP), `EventParticipantsCount` 가 broadcast 구독 + SUBSCRIBED/재가시화 시 서버 재동기화. postgres_changes(RLS·publication 의존) 제거로 호스트/참여자/비참여자 전원 수신. **라이브 검증 완료**(magiclink 로 host1 인증 → broadcast ±1 격리 수신 확인 + joinEvent end-to-end → 카운트 1 + DB row 1). 서버 `channel.send` HTTP 의 serverless 동작은 Phase 4-C 배포 후 재확인.
 2. **cover blob orphan 정리**: adminDeleteUser 의 cascade로 v2_events 가 사라질 때 storage cover blob 미정리 (adminDeleteEvent 만 deleteEventCover 호출). cron 또는 storage event hook 으로 orphan 청소 검토.
 3. **v2 마이그레이션 트래킹 정착**: Supabase Studio SQL Editor 적용 시 `supabase_migrations.schema_migrations` 미기록 → "어떤 migration 이 적용됐는지" 추적 어려움. Task 7 에서 publication 등 누락 발견. CLI `supabase db push` 또는 매번 MCP `apply_migration` 사용으로 정착.
 4. **권한 매트릭스 종합 검증**: 8 silent breakages 공통 root cause. spec 작성 시 권한 평가 path 별 (anon / authenticated / SECURITY DEFINER / service_role) 매트릭스 작성 + JWT 시뮬레이션 회귀 테스트 (CI 단계).
@@ -69,8 +69,8 @@
   - **4-A 체감 UX** ✅ 코드 완료 (2026-06-01): 홈 무한 스크롤(native IntersectionObserver, offset 페이징) + Realtime 카운트 복원(서버 broadcast) + 로딩 스켈레톤. Toast/debounce audit 결과 gap 0.
     - spec: `docs/superpowers/specs/2026-06-01-event-platform-v2-phase4a-ux-design.md`
     - plan: `docs/superpowers/plans/2026-06-01-event-platform-v2-phase4a-ux.md`
-    - 검증: tsc 0 / lint 0 / build 25 routes PASS / 최종 opus 코드리뷰(Critical 0, I2 수정) / 데이터 계층 offset 페이징 SQL 증명(page1=9, page2=4, overlap=0) / 홈 anon 빈 상태(authed-only RLS 의도 동작) 확인
-    - **수동 검증 대기**: authed 2세션 Realtime 카운트 UI, 브라우저 무한 스크롤 스크롤, 스켈레톤 노출 (OAuth 자동화 보류)
+    - 검증: tsc 0 / lint 0 / build 25 routes PASS / 최종 opus 코드리뷰(Critical 0, I2 수정) / 데이터 계층 offset 페이징 SQL 증명(page1=9, page2=4, overlap=0)
+    - **라이브 검증 완료** (magiclink 로 host1 인증, `docs/v2-phase4/playwright-mcp-ux.md`): 무한 스크롤(SSR 9 + loadMore 1회 + 정지, 무한루프 없음) / Realtime broadcast(±1 격리 수신 + joinEvent end-to-end, DB row 확인) / 이벤트 상세 production 정상(dev 500 은 Turbopack 워커 flakiness, 코드 무관) / 더미 데이터 정리 + orphan 0(cascade 확인)
     - 설계 보정 기록: ① `UPCOMING_PAGE_SIZE` 를 `lib/queries/events-constants.ts`(server-dep 0)로 분리 — 클라 컴포넌트가 `next/headers` 유입 없이 import (RSC 경계). ② 홈 로딩은 `app/loading.tsx`(전역 오적용) 대신 Suspense fallback 교체로 처리. ③ profile-form.tsx 가 Phase 2 더미(console.log + Server Action 미연결) 상태 발견 → 4-D 위생 작업으로 추적.
   - **4-B 성능·SEO**: Lighthouse 90+, 이미지·번들 최적화, 메타데이터 (미착수)
   - **4-C 배포·운영**: Vercel 배포, Sentry, 마이그레이션 트래킹(#3), 권한 매트릭스 CI(#4) (미착수) — 서버 `channel.send` HTTP 의 serverless 동작 재확인 포함

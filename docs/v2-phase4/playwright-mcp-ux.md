@@ -1,7 +1,14 @@
 # Phase 4-A 체감 UX — 검증 기록
 
 > 검증일: 2026-06-01
-> 방식: option A (자동화 가능분 + 데이터 계층 SQL 증명 + 코드 리뷰 신뢰; OAuth 2세션 자동화 보류)
+> 방식: 정적 회귀 + 데이터 계층 SQL 증명 + **라이브 검증**(Playwright MCP + 프로그램적 세션)
+
+## 인증 방법 (OAuth UI 우회)
+
+Google OAuth UI 자동화 대신, service_role 키로 magiclink 를 발급해 앱의 `/auth/confirm`
+라우트로 세션 쿠키를 심었다 (로컬, 본인 프로젝트, 검증 목적):
+1. `POST {SUPABASE_URL}/auth/v1/admin/generate_link` `{type:'magiclink', email:'inmingoon@gmail.com'}` → `hashed_token` 획득.
+2. 브라우저로 `/auth/confirm?token_hash=...&type=magiclink&next=/` 이동 → `verifyOtp` → 세션 쿠키 set → host1 인증.
 
 ## 정적 회귀
 
@@ -12,40 +19,35 @@
 | `npm run build` | 25/25 routes PASS |
 | 최종 코드리뷰 (opus, superpowers:code-reviewer) | Critical 0, Important I2 수정(loadMore 실패 시 관찰 중단), I1/I3/M1 문서화·수긍 |
 
-## 무한 스크롤
+## 무한 스크롤 — ✅ 라이브 검증
 
-### 데이터 계층 (SQL 증명 — getUpcomingEventsPage 와 동일 쿼리)
-시딩: `v2_events` 에 upcoming 더미 12개 추가(`invite_code` 프리픽스 `P4ATEST-`, created_by host1) → upcoming 총 13개.
+시딩: `v2_events` 에 upcoming 더미 12개(`invite_code` 프리픽스 `P4ATEST-`, created_by host1) → upcoming 총 13개.
 
-```sql
--- page1 = LIMIT 9 OFFSET 0, page2 = LIMIT 9 OFFSET 9, order by (event_date asc, id asc)
-page1_count=9, page2_count=4, overlap_count=0
-```
-→ 1페이지 9개 + 2페이지 4개, **경계 중복/누락 0**. 안정 정렬 `(event_date, id)` 정상.
+- **데이터 계층 SQL 증명**: `(event_date asc, id asc)` 정렬, page1=`LIMIT 9 OFFSET 0`=9개, page2=`LIMIT 9 OFFSET 9`=4개, **overlap=0**. 안정 정렬로 경계 중복/누락 없음.
+- **브라우저 라이브**: host1 로 `/` 접속 → 초기 SSR 9개 → 센티넬 진입으로 `loadMoreUpcomingEvents(9)` Server Action **1회 호출**(dev 로그 `POST / 200`, `loadMoreUpcomingEvents(9) in 400ms`) → 총 13개 렌더 후 `hasMore=false`로 **정지(추가 POST 없음 = 무한루프 없음, I2 수정 동작)**.
+- **anon 가시성**: 비로그인 시 "아직 이벤트가 없습니다" — `v2_events` SELECT 정책이 `authenticated` USING `true` 하나뿐이라 **의도된 동작**.
 
-### anon 가시성
-- 홈 `/` 비로그인 접속 → "아직 이벤트가 없습니다" 빈 상태 렌더 (Playwright MCP 확인).
-- 원인: `v2_events` SELECT 정책이 `v2_events_select_all_authenticated` (USING `true`, role `authenticated`) 하나뿐 → **anon 미가시 = 의도된 동작**. 이벤트는 로그인 사용자에게만 노출(초대 기반 platform).
+## Realtime 카운트 복원 — ✅ 라이브 검증
 
-### 브라우저 스크롤 UI — 수동 검증 대기
-- authed 세션 필요(이벤트가 authed-only). OAuth 자동화 보류(option A).
-- 클라이언트 무한 스크롤 lifecycle(IntersectionObserver observe/disconnect, `hasMore` 정지, offset=append-only length, 실패 시 관찰 중단)은 opus 코드리뷰로 검증.
-- **수동 확인 절차**: host1(inmingoon) 로그인 → `/` → 아래로 스크롤 → 9개 후 추가 4개 로드, 끝 도달 시 센티넬 제거 확인.
+- **broadcast 수신 격리**: host1 이벤트 상세(`참여자 0명`, broadcast 구독 중)를 **포그라운드 유지**(visibility=visible, resync 미발동)한 채, Node 에서 서버와 동일한 `channel.send({type:'broadcast', event:'participant_change', payload:{delta}})`(REST 폴백) 송신:
+  - `delta:+1` → 화면 **"참여자 1명"** (새로고침·포커스 변화 없이 broadcast 만으로 갱신)
+  - `delta:-1` → **"참여자 0명"** (감소 + `Math.max(0,…)` 음수 방지)
+- **joinEvent end-to-end**: `/invite/P4ATEST-01` → "참여하기" 클릭 → 이벤트 상세 리다이렉트, **"참여자 1명"** + DB `v2_event_participants` row **1건** 확인. 실제 Server Action 의 insert→broadcast→redirect 전체 경로 무에러.
+- **초기 resync**: 상세 로드 시 카운트가 서버값(0)으로 정확히 표시 — SUBSCRIBED 재동기화 동작.
 
-## Realtime 카운트 복원
+## 이벤트 상세 라우트 — dev 500 (Turbopack flakiness, 코드 무관)
 
-- 서버 broadcast 송신(`lib/actions/participants.ts`) + 클라 구독(`event-participants-count.tsx`) 계약 일치(채널 `event:{id}:participants` / event `participant_change` / `{delta}`), delta 게이팅(신규 insert만 +1, count>0 delete만 -1) 코드 검증 완료.
-- **런타임 2세션 UI 검증 대기**: authed OAuth 2세션 필요(host + 참여자). Phase 4-C 배포 후 + 사용자 수동.
-- **수동 확인 절차**: host 세션에서 이벤트 상세 열어둔 채, 다른 브라우저(시크릿, bandnell)로 invite 링크 통해 참여 → host 화면 "참여자 N명" 이 새로고침 없이 +1, 탈퇴 시 -1, 탭 재포커스 시 서버값 재동기화 확인.
+- dev(`next dev`, Turbopack)에서 `/events/[id]` 가 `WorkerError: Jest worker encountered ... child process exceptions` 로 500. application-code 는 정상 실행(33~217ms), 크래시는 Next 16.2.6 dev 렌더 워커.
+- **production(`next build && next start`)에서는 정상 렌더** — 코드 결함 아님, dev 전용 현상. (Next 16.2.6 Turbopack dev 워커 안정성 이슈)
 
 ## 스켈레톤 / 로딩
-- 컴포넌트 `EventCardSkeleton`/`EventListSkeleton` + 상세 Suspense fallback + my-events/admin `loading.tsx` 추가, build PASS.
-- 시각적 노출은 authed 라우트 진입 순간이라 수동 확인 대기.
 
-## 시딩 더미 정리 (수동 검증 후 실행)
+- `EventCardSkeleton`/`EventListSkeleton` + 상세 Suspense fallback + my-events/admin `loading.tsx` 빌드 PASS + opus 리뷰(형태 일치). 시각 노출은 production 렌더가 빨라 별도 캡처 생략 — 구조·빌드 검증으로 갈음.
 
-무한 스크롤 수동 검증이 끝나면 더미 12개를 제거:
+## 데이터 정리
+
+검증용 더미 12개 + 검증 중 생성된 host1 참여 row 모두 삭제 완료:
 ```sql
-delete from v2_events where invite_code like 'P4ATEST-%';
+delete from v2_events where invite_code like 'P4ATEST-%';  -- 12건 삭제, 참여 row cascade
 ```
-(보존하면 홈/통계에 테스트 이벤트가 계속 노출됨.)
+삭제 후: upcoming 1개(원상 복구), 더미 0, **orphan 참여 row 0**(FK ON DELETE CASCADE 정상 확인).
