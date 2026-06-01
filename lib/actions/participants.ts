@@ -28,6 +28,7 @@ export async function joinEvent(eventId: string): Promise<void> {
   });
   // 23505 = unique_violation (이미 참여 중) → idempotent silent pass.
   // supabase-js 가 향후 error.code 표면을 바꿔도 message regex 가 fallback.
+  let inserted = true;
   if (error) {
     const isDuplicate =
       error.code === "23505" || /duplicate key/i.test(error.message);
@@ -35,6 +36,12 @@ export async function joinEvent(eventId: string): Promise<void> {
       console.error("[joinEvent] DB failure", { eventId, code: error.code });
       throw new Error("이벤트 참여에 실패했습니다");
     }
+    inserted = false; // 이미 참여 중 → 카운트 변동 없음 (broadcast 생략)
+  }
+
+  // 신규 참여일 때만 카운트 +1 broadcast (서버 권위, best-effort).
+  if (inserted) {
+    await broadcastParticipantChange(supabase, eventId, 1);
   }
 
   revalidatePath(`/events/${eventId}`);
@@ -68,6 +75,31 @@ export async function leaveEvent(eventId: string): Promise<void> {
     throw new Error("참여 기록을 찾을 수 없습니다");
   }
 
+  // 실제 삭제됨 (count > 0) → 카운트 -1 broadcast.
+  await broadcastParticipantChange(supabase, eventId, -1);
+
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/my-events");
+}
+
+/**
+ * 참여자 카운트 변동을 broadcast 로 송신.
+ * subscribe() 하지 않은 채널에 send → supabase-js 가 HTTP 로 전송하므로
+ * 짧게 사는 Server Action 에 적합. 표시용 카운트라 공개 broadcast(private 미설정).
+ * best-effort: 실패해도 DB 변경은 이미 커밋됐으므로 흐름을 막지 않는다.
+ */
+async function broadcastParticipantChange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  delta: 1 | -1,
+): Promise<void> {
+  try {
+    await supabase.channel(`event:${eventId}:participants`).send({
+      type: "broadcast",
+      event: "participant_change",
+      payload: { delta },
+    });
+  } catch {
+    console.error("[broadcastParticipantChange] failed", { eventId, delta });
+  }
 }
