@@ -65,6 +65,28 @@ export async function getRecentEvents(limit = 5): Promise<Event[]> {
   return (data ?? []).map(mapEventRow);
 }
 
+/** 홈 무한 스크롤 한 페이지 크기 (3열 × 3행). 클라이언트/액션이 공유. */
+export const UPCOMING_PAGE_SIZE = 9;
+
+/**
+ * upcoming 이벤트 한 페이지.
+ * 정렬은 (event_date asc, id asc) — 동일 일자 tie-break 으로 페이지 경계 중복/누락 방지.
+ */
+export async function getUpcomingEventsPage(
+  offset: number,
+  limit: number,
+): Promise<Event[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("v2_events_with_status")
+    .select("*")
+    .eq("status", "upcoming")
+    .order("event_date", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + limit - 1);
+  return (data ?? []).map(mapEventRow);
+}
+
 /** upcoming 이벤트 — 시작시간 빠른 순. */
 export async function getUpcomingEvents(limit = 5): Promise<Event[]> {
   const supabase = await createClient();
