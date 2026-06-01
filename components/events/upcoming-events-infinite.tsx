@@ -28,9 +28,17 @@ export function UpcomingEventsInfinite({ initialEvents }: Props) {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
     try {
+      // offset 은 append-only 목록이라 현재 길이와 동치. offset 페이징 특성상
+      // 두 페이지 fetch 사이 행 삽입/삭제 시 경계 행 중복/누락이 가능하나,
+      // 표시용 "다가오는 이벤트" 그리드라 허용 (spec §3.1).
       const next = await loadMoreUpcomingEvents(events.length);
       setEvents((prev) => [...prev, ...next]);
       if (next.length < UPCOMING_PAGE_SIZE) setHasMore(false);
+    } catch {
+      // Server Action 실패 시 무한 재시도/스켈레톤 깜빡임 방지 — 관찰 중단.
+      // (새로고침으로 복구 가능. 표시용 목록이라 별도 재시도 UI 미도입.)
+      console.error("[UpcomingEventsInfinite] loadMore failed");
+      setHasMore(false);
     } finally {
       setIsLoading(false);
     }

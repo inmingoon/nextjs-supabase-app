@@ -30,6 +30,8 @@ export function EventParticipantsCount({ eventId, initialCount }: Props) {
   const [count, setCount] = useState(initialCount);
 
   // 서버 카운트 1회 재조회 (broadcast 유실 보정). 클라이언트도 같은 RPC 호출 가능.
+  // 진행 중 broadcast delta 와 경합 시 RPC 결과(서버 권위)가 덮어쓴다 — 표시용
+  // 카운트라 잠깐의 1 차이는 다음 broadcast/재가시화로 수렴 (의도된 동작).
   const resync = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase.rpc("v2_get_event_public_users", {
