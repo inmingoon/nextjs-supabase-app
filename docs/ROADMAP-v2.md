@@ -57,20 +57,24 @@
 
 ### Phase 3 후속 추적 항목 (Phase 4 또는 v2.x)
 
-1. **Realtime UX 복원**: RLS 정책 fix 부수 효과로 같은 이벤트 다른 참여자의 INSERT/DELETE Realtime 알림 차단됨. 본인 + host 알림은 정상. broadcast 채널 또는 SECURITY DEFINER 보조 함수로 "다른 참여자 가입 시 카운트 +1" UX 복원 검토.
+1. ~~**Realtime UX 복원**~~ → **Phase 4-A 에서 복원 (코드)**: 서버 측 broadcast 채택. joinEvent/leaveEvent Server Action 이 실제 DB 변동 시에만 `event:{id}:participants` 채널로 `{delta:±1}` 송신(`channel.send` HTTP), `EventParticipantsCount` 가 broadcast 구독 + SUBSCRIBED/재가시화 시 서버 재동기화. postgres_changes(RLS·publication 의존) 제거로 호스트/참여자/비참여자 전원 수신. **런타임 2세션 UI 검증은 수동 대기**(authed OAuth 2세션 필요 — 자동화 보류, Phase 4-C 배포 후 + 사용자 수동).
 2. **cover blob orphan 정리**: adminDeleteUser 의 cascade로 v2_events 가 사라질 때 storage cover blob 미정리 (adminDeleteEvent 만 deleteEventCover 호출). cron 또는 storage event hook 으로 orphan 청소 검토.
 3. **v2 마이그레이션 트래킹 정착**: Supabase Studio SQL Editor 적용 시 `supabase_migrations.schema_migrations` 미기록 → "어떤 migration 이 적용됐는지" 추적 어려움. Task 7 에서 publication 등 누락 발견. CLI `supabase db push` 또는 매번 MCP `apply_migration` 사용으로 정착.
 4. **권한 매트릭스 종합 검증**: 8 silent breakages 공통 root cause. spec 작성 시 권한 평가 path 별 (anon / authenticated / SECURITY DEFINER / service_role) 매트릭스 작성 + JWT 시뮬레이션 회귀 테스트 (CI 단계).
 5. **lib/queries/participants.ts:countParticipantsOfEvent 미사용 정리**: commit 237063c 이후 호출자 없음. RLS 정책 fix (1f464a6) 후 다시 작동 가능하므로 보존 결정.
-6. **admin-flow #2 검색 debounce UI confirmation**: 200ms debounce + 클라이언트 filter UX 는 코드 정상이나 사용자 환경 confirmation 미수집.
+6. ~~**admin-flow #2 검색 debounce UI confirmation**~~ → **Phase 4-A 에서 코드 확인 완료**: `admin-search-bar.tsx` 200ms debounce(`useEffect`+`setTimeout/clearTimeout`, `debounceMs` 기본 200, stale-closure 방지) 정상 확인. 런타임 UI 확인만 수동 대기.
 7. **audit_logs 테이블**: 현재 admin Server Actions 의 감사 로그는 `console.warn` (Vercel sink). v2.x 에서 audit_logs 테이블 도입 + admin UI 조회.
 
-- **Phase 4: 고급 기능 및 최적화** (Task 013~015)
-  - UX 향상 (Toast, 스켈레톤, 무한 스크롤)
-  - 성능 + SEO (Lighthouse 90+)
-  - Vercel 배포 + Sentry 모니터링
-
-상세는 brainstorming 후 채워질 예정.
+- **Phase 4: 고급 기능 및 최적화** — 4개 독립 서브프로젝트로 분해 (brainstorming 2026-06-01)
+  - **4-A 체감 UX** ✅ 코드 완료 (2026-06-01): 홈 무한 스크롤(native IntersectionObserver, offset 페이징) + Realtime 카운트 복원(서버 broadcast) + 로딩 스켈레톤. Toast/debounce audit 결과 gap 0.
+    - spec: `docs/superpowers/specs/2026-06-01-event-platform-v2-phase4a-ux-design.md`
+    - plan: `docs/superpowers/plans/2026-06-01-event-platform-v2-phase4a-ux.md`
+    - 검증: tsc 0 / lint 0 / build 25 routes PASS / 최종 opus 코드리뷰(Critical 0, I2 수정) / 데이터 계층 offset 페이징 SQL 증명(page1=9, page2=4, overlap=0) / 홈 anon 빈 상태(authed-only RLS 의도 동작) 확인
+    - **수동 검증 대기**: authed 2세션 Realtime 카운트 UI, 브라우저 무한 스크롤 스크롤, 스켈레톤 노출 (OAuth 자동화 보류)
+    - 설계 보정 기록: ① `UPCOMING_PAGE_SIZE` 를 `lib/queries/events-constants.ts`(server-dep 0)로 분리 — 클라 컴포넌트가 `next/headers` 유입 없이 import (RSC 경계). ② 홈 로딩은 `app/loading.tsx`(전역 오적용) 대신 Suspense fallback 교체로 처리. ③ profile-form.tsx 가 Phase 2 더미(console.log + Server Action 미연결) 상태 발견 → 4-D 위생 작업으로 추적.
+  - **4-B 성능·SEO**: Lighthouse 90+, 이미지·번들 최적화, 메타데이터 (미착수)
+  - **4-C 배포·운영**: Vercel 배포, Sentry, 마이그레이션 트래킹(#3), 권한 매트릭스 CI(#4) (미착수) — 서버 `channel.send` HTTP 의 serverless 동작 재확인 포함
+  - **4-D 데이터·코드 위생**: Minor 5건(M1~M5) + cover orphan(#2) + 미사용 함수(#5) + audit_logs(#7) + profile-form 실연결 (미착수)
 
 ---
 
