@@ -2,12 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
-import { EventCard } from "@/components/events/event-card";
+import { EventListSkeleton } from "@/components/events/event-card-skeleton";
 import { EventListEmpty } from "@/components/events/event-list-empty";
-import { getUpcomingEvents } from "@/lib/queries/events";
+import { UpcomingEventsInfinite } from "@/components/events/upcoming-events-infinite";
+import { getUpcomingEventsPage, UPCOMING_PAGE_SIZE } from "@/lib/queries/events";
 
 async function UpcomingEventsSection() {
-  const upcoming = await getUpcomingEvents(3);
+  const upcoming = await getUpcomingEventsPage(0, UPCOMING_PAGE_SIZE);
   if (upcoming.length === 0) {
     return (
       <EventListEmpty
@@ -21,13 +22,7 @@ async function UpcomingEventsSection() {
       />
     );
   }
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-      {upcoming.map((event) => (
-        <EventCard key={event.id} event={event} />
-      ))}
-    </div>
-  );
+  return <UpcomingEventsInfinite initialEvents={upcoming} />;
 }
 
 export default function HomePage() {
@@ -51,9 +46,7 @@ export default function HomePage() {
 
         <section className="mx-auto mt-12 max-w-2xl space-y-3">
           <h2 className="text-lg font-semibold">다가오는 이벤트</h2>
-          <Suspense
-            fallback={<p className="text-muted-foreground">로딩...</p>}
-          >
+          <Suspense fallback={<EventListSkeleton count={6} />}>
             <UpcomingEventsSection />
           </Suspense>
         </section>
