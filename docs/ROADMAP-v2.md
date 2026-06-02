@@ -73,7 +73,13 @@
     - **라이브 검증 완료** (magiclink 로 host1 인증, `docs/v2-phase4/playwright-mcp-ux.md`): 무한 스크롤(SSR 9 + loadMore 1회 + 정지, 무한루프 없음) / Realtime broadcast(±1 격리 수신 + joinEvent end-to-end, DB row 확인) / 이벤트 상세 production 정상(dev 500 은 Turbopack 워커 flakiness, 코드 무관) / 더미 데이터 정리 + orphan 0(cascade 확인)
     - 설계 보정 기록: ① `UPCOMING_PAGE_SIZE` 를 `lib/queries/events-constants.ts`(server-dep 0)로 분리 — 클라 컴포넌트가 `next/headers` 유입 없이 import (RSC 경계). ② 홈 로딩은 `app/loading.tsx`(전역 오적용) 대신 Suspense fallback 교체로 처리. ③ profile-form.tsx 가 Phase 2 더미(console.log + Server Action 미연결) 상태 발견 → 4-D 위생 작업으로 추적.
   - **4-B 성능·SEO**: Lighthouse 90+, 이미지·번들 최적화, 메타데이터 (미착수)
-  - **4-C 배포·운영**: Vercel 배포, Sentry, 마이그레이션 트래킹(#3), 권한 매트릭스 CI(#4) (미착수) — 서버 `channel.send` HTTP 의 serverless 동작 재확인 포함
+  - **4-C 배포·운영**:
+    - **4-C.1 Vercel 실배포** ✅ 완료 (2026-06-02): production `https://nextjs-supabase-app-topaz.vercel.app` (프로젝트 `nextjs-supabase-app`, prod 브랜치 `feat/event-platform-v2`). 코드/vercel.json 변경 0.
+      - spec: `docs/superpowers/specs/2026-06-01-event-platform-v2-phase4c1-vercel-deploy-design.md`, plan: `.../plans/2026-06-01-...phase4c1-vercel-deploy.md`, 결과: `docs/deploy/2026-06-02-v2-vercel-deploy-results.md`
+      - 검증: v2 빌드/secret 미노출/magiclink 로그인/무한스크롤(Server Action)/**broadcast serverless 송수신(R3·4-A 잔여 해소)**/admin 접근 — production 동작 확인
+      - 잔여: 실 Google OAuth Redirect 게이트는 magiclink 로 우회 검증돼 **사용자 수동 1회 로그인 확인 권장**. 이벤트 생성 storage 미검증.
+      - 트러블슈팅: 최초 배포가 옛 브랜치(starter 템플릿)로 떠 있었음 → Branch Tracking 전환 + v2 브랜치 push 로 해결(Redeploy 만으론 브랜치 안 바뀜).
+    - **4-C.2** (미착수): Sentry, 마이그레이션 트래킹(#3), 권한 매트릭스 CI(#4) — 별도 spec
   - **4-D 데이터·코드 위생**: Minor 5건(M1~M5) + cover orphan(#2) + 미사용 함수(#5) + audit_logs(#7) + profile-form 실연결 (미착수)
 
 ---
