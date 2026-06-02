@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Calendar, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EventStatusBadge } from "@/components/events/event-status-badge";
@@ -19,11 +20,12 @@ export function EventCard({ event }: Props) {
       <Card className="overflow-hidden transition-shadow hover:shadow-md">
         <div className="relative h-32 w-full bg-gradient-to-br from-slate-200 to-slate-400 dark:from-slate-700 dark:to-slate-900">
           {event.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={event.coverImageUrl}
               alt={event.title}
-              className="h-full w-full object-cover"
+              fill
+              sizes="(min-width: 768px) 224px, (min-width: 640px) 336px, 100vw"
+              className="object-cover"
             />
           ) : null}
           <div className="absolute right-2 top-2">

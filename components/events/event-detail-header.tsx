@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { EventStatusBadge } from "./event-status-badge";
 import { EventParticipantsCount } from "./event-participants-count";
 import { formatKstDateLong } from "@/lib/datetime";
@@ -13,12 +14,16 @@ export function EventDetailHeader({ event, participantCount }: Props) {
   return (
     <header className="space-y-4">
       {event.coverImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.coverImageUrl}
-          alt={event.title}
-          className="h-48 w-full rounded-lg object-cover"
-        />
+        <div className="relative h-48 w-full overflow-hidden rounded-lg">
+          <Image
+            src={event.coverImageUrl}
+            alt={event.title}
+            fill
+            sizes="100vw"
+            priority
+            className="object-cover"
+          />
+        </div>
       ) : (
         <div className="flex h-48 w-full items-center justify-center rounded-lg bg-muted">
           <CalendarIcon className="h-12 w-12 text-muted-foreground" />
