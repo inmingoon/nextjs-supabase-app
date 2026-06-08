@@ -1,12 +1,8 @@
 import { Suspense } from "react";
-import {
-  EventTrendChart,
-  type TrendPoint,
-} from "@/components/charts/event-trend-chart";
-import {
-  StatusPieChart,
-  type StatusSlice,
-} from "@/components/charts/status-pie-chart";
+import { EventTrendChartLazy } from "@/components/charts/event-trend-chart-lazy";
+import { StatusPieChartLazy } from "@/components/charts/status-pie-chart-lazy";
+import type { TrendPoint } from "@/components/charts/event-trend-chart";
+import type { StatusSlice } from "@/components/charts/status-pie-chart";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EventStatus } from "@/types/event";
@@ -78,7 +74,7 @@ async function AnalyticsCharts() {
           <CardTitle>월별 이벤트 생성 수</CardTitle>
         </CardHeader>
         <CardContent>
-          <EventTrendChart data={trend} />
+          <EventTrendChartLazy data={trend} />
         </CardContent>
       </Card>
 
@@ -87,7 +83,7 @@ async function AnalyticsCharts() {
           <CardTitle>이벤트 상태 분포</CardTitle>
         </CardHeader>
         <CardContent>
-          <StatusPieChart data={slices} />
+          <StatusPieChartLazy data={slices} />
         </CardContent>
       </Card>
     </div>
