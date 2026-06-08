@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Event } from "@/types/event";
 import type { Database } from "@/lib/database.types";
@@ -22,8 +23,8 @@ function mapEventRow(row: EventWithStatusRow): Event {
   };
 }
 
-/** id로 이벤트 조회. */
-export async function getEventById(id: string): Promise<Event | null> {
+/** id로 이벤트 조회. generateMetadata + 페이지 본문이 공유 → 요청 내 1회로 dedup. */
+export const getEventById = cache(async (id: string): Promise<Event | null> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("v2_events_with_status")
@@ -31,18 +32,20 @@ export async function getEventById(id: string): Promise<Event | null> {
     .eq("id", id)
     .maybeSingle();
   return data ? mapEventRow(data) : null;
-}
+});
 
-/** invite_code로 이벤트 조회. anon도 호출 가능 (SECURITY DEFINER 함수). */
-export async function getEventByInviteCode(code: string): Promise<Event | null> {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("v2_get_event_by_invite_code", {
-    p_code: code,
-  });
-  // 함수 반환은 단일 row 형태. id 누락 시 미존재로 간주.
-  if (!data || !(data as EventWithStatusRow).id) return null;
-  return mapEventRow(data as EventWithStatusRow);
-}
+/** invite_code로 이벤트 조회. anon도 호출 가능 (SECURITY DEFINER 함수). 요청 내 1회 dedup. */
+export const getEventByInviteCode = cache(
+  async (code: string): Promise<Event | null> => {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("v2_get_event_by_invite_code", {
+      p_code: code,
+    });
+    // 함수 반환은 단일 row 형태. id 누락 시 미존재로 간주.
+    if (!data || !(data as EventWithStatusRow).id) return null;
+    return mapEventRow(data as EventWithStatusRow);
+  },
+);
 
 /** 특정 사용자가 생성한 이벤트 목록 (최신 일자 우선). */
 export async function getEventsByCreator(userId: string): Promise<Event[]> {
