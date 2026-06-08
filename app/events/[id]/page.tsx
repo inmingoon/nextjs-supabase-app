@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
@@ -13,6 +14,17 @@ import { getEventPublicUsers } from "@/lib/queries/participants";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { Pencil } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const event = await getEventById(id);
+  // 인증 게이트라 크롤러 무관 — 앱 내 탭 타이틀/북마크용 title 만.
+  return { title: event ? event.title : "이벤트", robots: { index: false } };
+}
 
 async function EventDetailContent({
   params,
