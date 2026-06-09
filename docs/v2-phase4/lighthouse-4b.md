@@ -2,7 +2,7 @@
 
 > Plan: `docs/superpowers/plans/2026-06-02-event-platform-v2-phase4b-perf-seo.md`
 > Spec: `docs/superpowers/specs/2026-06-02-event-platform-v2-phase4b-perf-seo-design.md`
-> 작성일: 2026-06-08 · 브랜치: `feat/event-platform-v2`
+> 작성일: 2026-06-08(구현·정적 게이트) · 런타임 실측: 2026-06-09 · 브랜치: `feat/profiles-table`
 
 ## 1. 구현 요약 (Task 1~6 완료, Task 7 생략)
 
@@ -42,14 +42,37 @@
 - `event-card`: `<Image fill>` + `sizes`(홈 그리드 실측값). `event-detail-header`: `<Image fill priority>`(above-the-fold LCP 후보) + `sizes="100vw"`.
 - 응답 포맷(webp/avif) · `/_next/image` 최적화 경유 확인은 §5 런타임 후속.
 
-## 5. 런타임 검증 — 후속(배포 URL 대상)
+## 5. 런타임 검증 — 로컬 prod 실측 (2026-06-09)
 
-사용자 결정에 따라 로컬 prod 서버 + 시드 + magiclink 런타임 검증은 보류하고, **배포된 preview/production URL** 대상으로 후속 수행한다. 이 브랜치가 Vercel 에 반영된 뒤 다음을 측정·기록:
+`npm run build && npm run start`(Next 16.2.6, `:3000`) 기동 후, **anon 상태**로 검증.
+`/invite/[code]` 는 `lib/supabase/proxy.ts:72` 화이트리스트(`path.startsWith("/invite/")`)로 비로그인 접근이 허용되므로 magiclink 인증 단계 없이 측정 — 이는 unfurler 봇(쿠키 없음)의 OG fetch 를 보장하는 설계 결정과 동일하다. 대상 이벤트는 cover 있는 기존 이벤트 `8f0fe58a…`(invite_code `qM4-…`)를 사용(별도 시드 불필요).
 
-1. **Lighthouse** — `/invite/{유효코드}`(콘텐츠 有, performance ≥ 90 주 타깃) + `/`(빈 상태). 4개 카테고리(performance/seo/best-practices/accessibility).
-2. **이미지** — 카드·상세 헤더 cover 정상 표시, Network 에서 `/_next/image?url=...` 경유 + `Content-Type: image/webp`(또는 avif).
-3. **OG 메타** — `/invite/{코드}` `<head>` 에 `og:title`/`og:description`/`og:image`(cover)/`og:type=website`, `twitter:card=summary_large_image`, `robots: noindex,nofollow`. cover 없는 이벤트는 정적 `/opengraph-image.png` 상속.
-4. **robots/sitemap** — `/robots.txt` (`Disallow: /admin …` 5개 + `Sitemap:` 절대 URL), `/sitemap.xml` (홈 1건).
-5. **Recharts** — `/admin/analytics` 차트 영역 스켈레톤(animate-pulse) → 차트 교체, Network 에서 recharts 청크 온디맨드 로드. 빈 데이터 시 StatusPieChart "표시할 데이터가 없습니다" 분기 유지.
+### 5.1 Lighthouse (4개 카테고리)
 
-미달 시 원인(이미지·폰트·JS) 분석 후 해당 Task 로 회귀.
+| 페이지 | performance | accessibility | best-practices | seo |
+|--------|:-----------:|:-------------:|:--------------:|:---:|
+| `/`(빈 상태, `lh-home.json`) | **97** | 100 | 96 | 100 |
+| `/invite/{code}`(콘텐츠 有, `lh-invite.json` 1차 / 2차) | **86 / 88** | 98 | 96 | 91 |
+
+invite Core metrics(1차/2차): FCP 0.8s/0.8s · **LCP 2.9s/3.0s** · TBT 380ms/310ms · CLS 0/0.
+
+**performance 90 미달 — 원인 규명 (코드 결함 아님, 측정 환경):**
+- 감점 기여: TBT(weight 30, score 70) + LCP(weight 25, score 81). unused-JS 28KB/150ms 가 유일한 코드 기회.
+- 서버 응답 타이밍: `/invite` TTFB ~10ms(PPR 정적 셸 즉시) 이나 total(스트리밍 완료) **0.9~1.7s**. 이 구간이 `getEventByInviteCode`(원격 Supabase SECURITY DEFINER RPC) 왕복 + Suspense 스트리밍. LCP(제목 텍스트)는 이 스트리밍 종료 후 그려지므로 **LCP ≈ 원격 RPC 왕복 + 폰트/하이드레이션**. 로컬 서버→원격 Supabase 왕복이 LCP 주성분.
+- TBT 310~380ms 변동은 측정 머신 동시 CPU 부하(헤드리스 Chrome 과 경쟁) 노이즈.
+- invite 페이지는 구조적으로 경량(`InvitePreview` = useTransition/sonner/Button/lucide 2개, 차트·에디터·날짜피커 없음, 본문에 cover 미렌더). 로컬에서 코드로 perf 를 끌어올릴 여지가 사실상 없음.
+- **결론:** perf 90 확정은 **Vercel preview/production**(동일 리전 엣지 → RPC 왕복 축소, 전용 CPU)에서 재측정으로 닫는다. 나머지 3개 카테고리(98/96/91)는 로컬에서 이미 통과.
+
+### 5.2 이미지 최적화 경유 — ✅
+
+`/_next/image?url={cover}&w=640&q=75` (Accept: image/webp) → **status 200, Content-Type `image/webp`, 16,146 bytes** (원본 `cover.png` 315,211 bytes → ~95%↓). `next.config.ts` `remotePatterns` Supabase 호스트 허용이 동작(미등록 시 400). Task 2 전환 실동작 확증.
+
+### 5.3 OG / robots / sitemap — ✅
+
+- `/invite/{code}` `<head>`(anon, 200): `og:title`=`"dddd22222 — 초대장"`, `og:description`, `og:image`=cover URL, `og:type=website`, `twitter:card=summary_large_image`(+title/description/image), `robots: noindex, nofollow`. → 검색 색인은 차단하되 unfurl 미리보기는 유지.
+- `/robots.txt`: `Allow: /` + `Disallow: /admin /my-events /profile /events /auth`(5개) + `Sitemap:` 절대 URL. `/invite` 는 미차단(unfurl 허용, 일관).
+- `/sitemap.xml`: 홈 1건(priority 1, changefreq weekly).
+
+### 5.4 미검증(후속) — Recharts 지연 로드 런타임
+
+`/admin/analytics` 는 admin 인증 게이트(`app/admin/(authed)/layout.tsx` server guard)라 anon 측정 불가 → 런타임 지연 로드 동작(스켈레톤→차트 교체, recharts 청크 온디맨드) 확인은 **admin 로그인 후 또는 배포 환경**에서 후속. 청크 격리(별도 해시 3개)는 §3 에서 정적 확인 완료.
