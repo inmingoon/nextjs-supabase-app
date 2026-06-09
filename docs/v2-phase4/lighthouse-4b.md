@@ -73,6 +73,16 @@ invite Core metrics(1차/2차): FCP 0.8s/0.8s · **LCP 2.9s/3.0s** · TBT 380ms/
 - `/robots.txt`: `Allow: /` + `Disallow: /admin /my-events /profile /events /auth`(5개) + `Sitemap:` 절대 URL. `/invite` 는 미차단(unfurl 허용, 일관).
 - `/sitemap.xml`: 홈 1건(priority 1, changefreq weekly).
 
-### 5.4 미검증(후속) — Recharts 지연 로드 런타임
+### 5.4 Recharts 지연 로드 런타임 — ✅ (2026-06-09, admin magiclink 로그인)
 
-`/admin/analytics` 는 admin 인증 게이트(`app/admin/(authed)/layout.tsx` server guard)라 anon 측정 불가 → 런타임 지연 로드 동작(스켈레톤→차트 교체, recharts 청크 온디맨드) 확인은 **admin 로그인 후 또는 배포 환경**에서 후속. 청크 격리(별도 해시 3개)는 §3 에서 정적 확인 완료.
+`inmingoon@gmail.com`(v2_admin) magiclink 인증 → `/admin/analytics` 도달 후 Playwright 관측:
+- **"차트 로딩..." fallback 표시 → 차트로 교체**. recharts 가 초기 번들에 인라인됐다면 fallback 없이 즉시 렌더됐을 것 → fallback 관측 자체가 **온디맨드 청크 로드 확정**(Network: 차트 청크가 초기 청크 묶음과 분리되어 후행 200 로드). §3 정적 청크 격리(별도 해시)와 일치.
+- EventTrendChart(월별 생성 수, X축 `2026-05`) + StatusPieChart(상태 분포: 예정 1·진행 0·종료 8) 정상 렌더. 데이터 존재로 "표시할 데이터가 없습니다" 빈 분기는 미발동(코드상 존재, 별도 케이스).
+- Console error 는 `/_vercel/insights/script.js` 404 (로컬 전용 — Vercel Web Analytics 는 배포 환경에서만 서빙) — 차트와 무관.
+
+## 6. 폰트 self-host (후속 #3, 2026-06-09 · 커밋 `d69e933`)
+
+`app/layout.tsx` 의 Geist 를 `next/font/google` → Vercel `geist` 패키지(`geist/font/sans`, 폰트 파일 npm 동봉)로 전환.
+- **이유**: `next/font/google` 은 **빌드 타임에 fonts.googleapis.com 에서 폰트를 fetch** 해 self-host 로 인라인한다. 이 환경의 간헐 Google Fonts egress 차단 시 빌드가 폰트 단계(`app/layout.tsx`)에서 실패 — 이번 세션에서 2회 관측(DNS resolve timeout, status 000).
+- **검증**: 폰트 fetch 제거 후 **egress 차단 상태에서도** `npm run build` exit 0, route 27 — 빌드의 외부 폰트 의존이 제거됨을 확정. tsc/lint 통과.
+- 동일 Geist 폰트라 시각/타이포 변화 없음. self-host 라 LCP 의 폰트 swap 대기도 소폭 개선(§5.1 perf 후속에 긍정적).
