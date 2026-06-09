@@ -6,7 +6,9 @@
  * 값은 scheme 포함 절대 URL 이어야 함 — metadataBase 의 `new URL()` 평가 시점에 검증된다.
  */
 const rawSiteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ??
+  // `||` (truthy) — 빈 문자열 `NEXT_PUBLIC_SITE_URL=""` 도 폴백시킨다.
+  // `??` 였다면 빈 문자열이 통과해 `new URL("")` 가 layout 평가 시 throw.
+  process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.VERCEL_URL
