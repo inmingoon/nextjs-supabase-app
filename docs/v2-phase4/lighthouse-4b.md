@@ -63,6 +63,11 @@ invite Core metrics(1차/2차): FCP 0.8s/0.8s · **LCP 2.9s/3.0s** · TBT 380ms/
 - invite 페이지는 구조적으로 경량(`InvitePreview` = useTransition/sonner/Button/lucide 2개, 차트·에디터·날짜피커 없음, 본문에 cover 미렌더). 로컬에서 코드로 perf 를 끌어올릴 여지가 사실상 없음.
 - **결론:** perf 90 확정은 **Vercel preview/production**(동일 리전 엣지 → RPC 왕복 축소, 전용 CPU)에서 재측정으로 닫는다. 나머지 3개 카테고리(98/96/91)는 로컬에서 이미 통과.
 
+**Vercel edge 재측정 — 운영 후속으로 보류 (2026-06-14):**
+- Vercel preview 빌드(commit `71478f2`)는 **success**. 단 공개 preview URL(`nextjs-supabase-app-…inmingoon-2713s-projects.vercel.app`)은 **HTTP 401 (Vercel Deployment Protection — Preview 기본 "Vercel Authentication")** 으로 막혀, 유효한 Vercel 세션 쿠키나 `x-vercel-protection-bypass` 토큰 없이는 헤드리스 Lighthouse 자동 측정 불가. (DNS는 정상 해석 — §5 로컬 invite 측정을 막던 로컬→Supabase DNS 미해석과는 별개 차단.)
+- **사용자 결정(2026-06-14): perf 90 재측정은 운영 후속으로 남기고 Phase 4-B 종결.** 근거: perf 86/88은 코드 결함이 아닌 측정 환경(로컬→원격 RPC 왕복 = LCP 주성분)으로 이미 근본 규명됐고, a11y/best-practices/seo 3개 카테고리는 통과.
+- **재개 조건(향후 운영 시):** ① Vercel Settings → Deployment Protection에서 "Protection Bypass for Automation" 토큰 발급 후 `x-vercel-protection-bypass` 헤더로 Lighthouse 실행, 또는 ② preview/production을 공개로 전환해 edge URL 직접 측정. 둘 다 Supabase env(`NEXT_PUBLIC_SUPABASE_*`) 주입 + cover 보유 invite 이벤트 시드가 선행돼야 invite perf 가 유의미.
+
 ### 5.2 이미지 최적화 경유 — ✅
 
 `/_next/image?url={cover}&w=640&q=75` (Accept: image/webp) → **status 200, Content-Type `image/webp`, 16,146 bytes** (원본 `cover.png` 315,211 bytes → ~95%↓). `next.config.ts` `remotePatterns` Supabase 호스트 허용이 동작(미등록 시 400). Task 2 전환 실동작 확증.
